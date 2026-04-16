@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
@@ -17,7 +18,13 @@ import { Route as DashboardStatistiquesRouteImport } from './routes/dashboard/st
 import { Route as DashboardReglagesRouteImport } from './routes/dashboard/reglages'
 import { Route as DashboardEntreprisesRouteImport } from './routes/dashboard/entreprises'
 import { Route as DashboardCollaborateursRouteImport } from './routes/dashboard/collaborateurs'
+import { Route as DashboardCollaborateursIdRouteImport } from './routes/dashboard/collaborateurs.$id'
 
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -58,76 +65,102 @@ const DashboardCollaborateursRoute = DashboardCollaborateursRouteImport.update({
   path: '/collaborateurs',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardCollaborateursIdRoute =
+  DashboardCollaborateursIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => DashboardCollaborateursRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
-  '/dashboard/collaborateurs': typeof DashboardCollaborateursRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/dashboard/collaborateurs': typeof DashboardCollaborateursRouteWithChildren
   '/dashboard/entreprises': typeof DashboardEntreprisesRoute
   '/dashboard/reglages': typeof DashboardReglagesRoute
   '/dashboard/statistiques': typeof DashboardStatistiquesRoute
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/collaborateurs/$id': typeof DashboardCollaborateursIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard/collaborateurs': typeof DashboardCollaborateursRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/dashboard/collaborateurs': typeof DashboardCollaborateursRouteWithChildren
   '/dashboard/entreprises': typeof DashboardEntreprisesRoute
   '/dashboard/reglages': typeof DashboardReglagesRoute
   '/dashboard/statistiques': typeof DashboardStatistiquesRoute
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/dashboard/collaborateurs/$id': typeof DashboardCollaborateursIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
-  '/dashboard/collaborateurs': typeof DashboardCollaborateursRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/dashboard/collaborateurs': typeof DashboardCollaborateursRouteWithChildren
   '/dashboard/entreprises': typeof DashboardEntreprisesRoute
   '/dashboard/reglages': typeof DashboardReglagesRoute
   '/dashboard/statistiques': typeof DashboardStatistiquesRoute
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/collaborateurs/$id': typeof DashboardCollaborateursIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/dashboard'
+    | '/reset-password'
     | '/dashboard/collaborateurs'
     | '/dashboard/entreprises'
     | '/dashboard/reglages'
     | '/dashboard/statistiques'
     | '/dashboard/vehicules'
     | '/dashboard/'
+    | '/dashboard/collaborateurs/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/reset-password'
     | '/dashboard/collaborateurs'
     | '/dashboard/entreprises'
     | '/dashboard/reglages'
     | '/dashboard/statistiques'
     | '/dashboard/vehicules'
     | '/dashboard'
+    | '/dashboard/collaborateurs/$id'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
+    | '/reset-password'
     | '/dashboard/collaborateurs'
     | '/dashboard/entreprises'
     | '/dashboard/reglages'
     | '/dashboard/statistiques'
     | '/dashboard/vehicules'
     | '/dashboard/'
+    | '/dashboard/collaborateurs/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRouteWithChildren
+  ResetPasswordRoute: typeof ResetPasswordRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -184,11 +217,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCollaborateursRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/collaborateurs/$id': {
+      id: '/dashboard/collaborateurs/$id'
+      path: '/$id'
+      fullPath: '/dashboard/collaborateurs/$id'
+      preLoaderRoute: typeof DashboardCollaborateursIdRouteImport
+      parentRoute: typeof DashboardCollaborateursRoute
+    }
   }
 }
 
+interface DashboardCollaborateursRouteChildren {
+  DashboardCollaborateursIdRoute: typeof DashboardCollaborateursIdRoute
+}
+
+const DashboardCollaborateursRouteChildren: DashboardCollaborateursRouteChildren =
+  {
+    DashboardCollaborateursIdRoute: DashboardCollaborateursIdRoute,
+  }
+
+const DashboardCollaborateursRouteWithChildren =
+  DashboardCollaborateursRoute._addFileChildren(
+    DashboardCollaborateursRouteChildren,
+  )
+
 interface DashboardRouteChildren {
-  DashboardCollaborateursRoute: typeof DashboardCollaborateursRoute
+  DashboardCollaborateursRoute: typeof DashboardCollaborateursRouteWithChildren
   DashboardEntreprisesRoute: typeof DashboardEntreprisesRoute
   DashboardReglagesRoute: typeof DashboardReglagesRoute
   DashboardStatistiquesRoute: typeof DashboardStatistiquesRoute
@@ -197,7 +251,7 @@ interface DashboardRouteChildren {
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
-  DashboardCollaborateursRoute: DashboardCollaborateursRoute,
+  DashboardCollaborateursRoute: DashboardCollaborateursRouteWithChildren,
   DashboardEntreprisesRoute: DashboardEntreprisesRoute,
   DashboardReglagesRoute: DashboardReglagesRoute,
   DashboardStatistiquesRoute: DashboardStatistiquesRoute,
@@ -212,6 +266,7 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRouteWithChildren,
+  ResetPasswordRoute: ResetPasswordRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
