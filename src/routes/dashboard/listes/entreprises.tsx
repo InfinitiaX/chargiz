@@ -21,7 +21,7 @@ interface Entreprise {
 }
 
 function ListeEntreprises() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -29,16 +29,23 @@ function ListeEntreprises() {
   const canAccess = role === "superadmin" || role === "admin";
 
   useEffect(() => {
-    if (!canAccess) return;
+    if (loading || !canAccess) return;
     loadData();
-  }, [canAccess]);
-
+  }, [loading, canAccess]);
   async function loadData() {
     const { data } = await supabase
       .from("entreprises")
       .select("id, nom, siren, siret, ville, email, created_at")
       .order("nom");
     if (data) setEntreprises(data);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
   }
 
   if (!canAccess) {
