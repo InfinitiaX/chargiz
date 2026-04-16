@@ -9,38 +9,132 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as DashboardVehiculesRouteImport } from './routes/dashboard/vehicules'
+import { Route as DashboardStatistiquesRouteImport } from './routes/dashboard/statistiques'
+import { Route as DashboardReglagesRouteImport } from './routes/dashboard/reglages'
+import { Route as DashboardEntreprisesRouteImport } from './routes/dashboard/entreprises'
+import { Route as DashboardCollaborateursRouteImport } from './routes/dashboard/collaborateurs'
 
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardVehiculesRoute = DashboardVehiculesRouteImport.update({
+  id: '/vehicules',
+  path: '/vehicules',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardStatistiquesRoute = DashboardStatistiquesRouteImport.update({
+  id: '/statistiques',
+  path: '/statistiques',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardReglagesRoute = DashboardReglagesRouteImport.update({
+  id: '/reglages',
+  path: '/reglages',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardEntreprisesRoute = DashboardEntreprisesRouteImport.update({
+  id: '/entreprises',
+  path: '/entreprises',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardCollaborateursRoute = DashboardCollaborateursRouteImport.update({
+  id: '/collaborateurs',
+  path: '/collaborateurs',
+  getParentRoute: () => DashboardRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRouteWithChildren
+  '/dashboard/collaborateurs': typeof DashboardCollaborateursRoute
+  '/dashboard/entreprises': typeof DashboardEntreprisesRoute
+  '/dashboard/reglages': typeof DashboardReglagesRoute
+  '/dashboard/statistiques': typeof DashboardStatistiquesRoute
+  '/dashboard/vehicules': typeof DashboardVehiculesRoute
+  '/dashboard/': typeof DashboardIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dashboard/collaborateurs': typeof DashboardCollaborateursRoute
+  '/dashboard/entreprises': typeof DashboardEntreprisesRoute
+  '/dashboard/reglages': typeof DashboardReglagesRoute
+  '/dashboard/statistiques': typeof DashboardStatistiquesRoute
+  '/dashboard/vehicules': typeof DashboardVehiculesRoute
+  '/dashboard': typeof DashboardIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRouteWithChildren
+  '/dashboard/collaborateurs': typeof DashboardCollaborateursRoute
+  '/dashboard/entreprises': typeof DashboardEntreprisesRoute
+  '/dashboard/reglages': typeof DashboardReglagesRoute
+  '/dashboard/statistiques': typeof DashboardStatistiquesRoute
+  '/dashboard/vehicules': typeof DashboardVehiculesRoute
+  '/dashboard/': typeof DashboardIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/dashboard/collaborateurs'
+    | '/dashboard/entreprises'
+    | '/dashboard/reglages'
+    | '/dashboard/statistiques'
+    | '/dashboard/vehicules'
+    | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/dashboard/collaborateurs'
+    | '/dashboard/entreprises'
+    | '/dashboard/reglages'
+    | '/dashboard/statistiques'
+    | '/dashboard/vehicules'
+    | '/dashboard'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/dashboard/collaborateurs'
+    | '/dashboard/entreprises'
+    | '/dashboard/reglages'
+    | '/dashboard/statistiques'
+    | '/dashboard/vehicules'
+    | '/dashboard/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,21 +142,77 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/vehicules': {
+      id: '/dashboard/vehicules'
+      path: '/vehicules'
+      fullPath: '/dashboard/vehicules'
+      preLoaderRoute: typeof DashboardVehiculesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/statistiques': {
+      id: '/dashboard/statistiques'
+      path: '/statistiques'
+      fullPath: '/dashboard/statistiques'
+      preLoaderRoute: typeof DashboardStatistiquesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/reglages': {
+      id: '/dashboard/reglages'
+      path: '/reglages'
+      fullPath: '/dashboard/reglages'
+      preLoaderRoute: typeof DashboardReglagesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/entreprises': {
+      id: '/dashboard/entreprises'
+      path: '/entreprises'
+      fullPath: '/dashboard/entreprises'
+      preLoaderRoute: typeof DashboardEntreprisesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/collaborateurs': {
+      id: '/dashboard/collaborateurs'
+      path: '/collaborateurs'
+      fullPath: '/dashboard/collaborateurs'
+      preLoaderRoute: typeof DashboardCollaborateursRouteImport
+      parentRoute: typeof DashboardRoute
+    }
   }
 }
 
+interface DashboardRouteChildren {
+  DashboardCollaborateursRoute: typeof DashboardCollaborateursRoute
+  DashboardEntreprisesRoute: typeof DashboardEntreprisesRoute
+  DashboardReglagesRoute: typeof DashboardReglagesRoute
+  DashboardStatistiquesRoute: typeof DashboardStatistiquesRoute
+  DashboardVehiculesRoute: typeof DashboardVehiculesRoute
+  DashboardIndexRoute: typeof DashboardIndexRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardCollaborateursRoute: DashboardCollaborateursRoute,
+  DashboardEntreprisesRoute: DashboardEntreprisesRoute,
+  DashboardReglagesRoute: DashboardReglagesRoute,
+  DashboardStatistiquesRoute: DashboardStatistiquesRoute,
+  DashboardVehiculesRoute: DashboardVehiculesRoute,
+  DashboardIndexRoute: DashboardIndexRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
