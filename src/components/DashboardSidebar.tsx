@@ -1,8 +1,8 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { useAuth } from "@/hooks/useAuth";
 import logoWhite from "@/assets/logo-white.jpg";
 import {
   LayoutDashboard,
-  List,
   BarChart3,
   Settings,
   LogOut,
@@ -22,6 +22,13 @@ const navItems = [
 
 export default function DashboardSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut, profile, role } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate({ to: "/" });
+  };
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground">
@@ -29,6 +36,14 @@ export default function DashboardSidebar() {
       <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-6">
         <img src={logoWhite} alt="ChargiZ" className="h-10 w-auto" />
       </div>
+
+      {/* User info */}
+      {profile && (
+        <div className="border-b border-sidebar-border px-4 py-3">
+          <p className="text-sm font-medium text-sidebar-foreground">{profile.prenom} {profile.nom}</p>
+          <p className="text-xs text-sidebar-foreground/60 capitalize">{role?.replace(/_/g, " ") || "—"}</p>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-6">
@@ -56,13 +71,13 @@ export default function DashboardSidebar() {
 
       {/* Bottom */}
       <div className="border-t border-sidebar-border p-4">
-        <Link
-          to="/"
-          className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
         >
           <LogOut className="h-5 w-5" />
           Déconnexion
-        </Link>
+        </button>
       </div>
     </aside>
   );
