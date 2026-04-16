@@ -35,6 +35,7 @@ export default function DashboardSidebar() {
   };
 
   const isCollab = role === "collaborateur";
+  const isSuperOrAdmin = role === "superadmin" || role === "admin";
 
   const mainNav = isCollab
     ? [
@@ -46,6 +47,7 @@ export default function DashboardSidebar() {
     : [
         { to: "/dashboard", icon: LayoutDashboard, label: "Accueil" },
         { to: "/dashboard/statistiques", icon: BarChart3, label: "Statistiques" },
+        ...(isSuperOrAdmin ? [{ to: "/dashboard/entreprises", icon: Building2, label: "Entreprises" }] : []),
       ];
 
   const listesItems = [
