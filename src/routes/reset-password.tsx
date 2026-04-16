@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import logoDark from "@/assets/logo-dark.jpg";
+import logoChargiz from "@/assets/logo-chargiz.png";
 import { Lock, CheckCircle } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
@@ -61,7 +61,7 @@ function ResetPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <img src={logoDark} alt="ChargiZ" className="mx-auto h-10" />
+          <img src={logoChargiz} alt="ChargiZ" className="mx-auto h-10" />
           <Lock className="mx-auto mt-6 h-12 w-12 text-primary" />
           <h1 className="mt-4 text-2xl font-bold text-foreground">Nouveau mot de passe</h1>
           <p className="mt-2 text-sm text-muted-foreground">Choisissez un nouveau mot de passe sécurisé</p>
