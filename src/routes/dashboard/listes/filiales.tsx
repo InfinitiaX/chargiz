@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import { Search, Building2, Eye, Edit, Archive } from "lucide-react";
+import CreateFilialeDialog from "@/components/CreateFilialeDialog";
+import { Search, Building2, Eye, Edit, Archive, Plus, X } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/listes/filiales")({
   component: ListeFiliales,
@@ -14,8 +15,13 @@ interface Filiale {
   nom: string;
   adresse: string | null;
   ville: string | null;
+  code_postal: string | null;
+  siret: string | null;
+  numero_tva: string | null;
   responsable_nom: string | null;
   responsable_prenom: string | null;
+  responsable_email: string | null;
+  responsable_telephone: string | null;
   entreprise_id: string;
 }
 
@@ -25,6 +31,9 @@ function ListeFiliales() {
   const [filiales, setFiliales] = useState<Filiale[]>([]);
   const [stats, setStats] = useState<Record<string, { sites: number; collabs: number }>>({});
   const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [editFiliale, setEditFiliale] = useState<Filiale | null>(null);
+  const [viewFiliale, setViewFiliale] = useState<Filiale | null>(null);
 
   useEffect(() => {
     if (!entrepriseId) return;
@@ -32,9 +41,9 @@ function ListeFiliales() {
   }, [entrepriseId]);
 
   async function loadData() {
-    const { data } = await supabase.from("filiales").select("id, nom, adresse, ville, responsable_nom, responsable_prenom, entreprise_id").order("nom");
+    const { data } = await supabase.from("filiales").select("*").eq("entreprise_id", entrepriseId).order("nom");
     if (data) {
-      setFiliales(data);
+      setFiliales(data as Filiale[]);
       const map: Record<string, { sites: number; collabs: number }> = {};
       for (const f of data) {
         const [s, c] = await Promise.all([
@@ -47,13 +56,43 @@ function ListeFiliales() {
     }
   }
 
+  const handleArchive = async (id: string) => {
+    if (!confirm("Voulez-vous archiver cette filiale ? Cette action désactivera la filiale.")) return;
+    await supabase.from("filiales").delete().eq("id", id);
+    loadData();
+  };
+
+  const handleEditSave = async () => {
+    if (!editFiliale) return;
+    await supabase.from("filiales").update({
+      nom: editFiliale.nom,
+      adresse: editFiliale.adresse,
+      ville: editFiliale.ville,
+      code_postal: editFiliale.code_postal,
+      siret: editFiliale.siret,
+      numero_tva: editFiliale.numero_tva,
+      responsable_nom: editFiliale.responsable_nom,
+      responsable_prenom: editFiliale.responsable_prenom,
+      responsable_email: editFiliale.responsable_email,
+      responsable_telephone: editFiliale.responsable_telephone,
+    }).eq("id", editFiliale.id);
+    setEditFiliale(null);
+    loadData();
+  };
+
   const filtered = filiales.filter(f => !search || `${f.nom} ${f.ville}`.toLowerCase().includes(search.toLowerCase()));
+  const inputCls = "w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Filiales</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Liste des filiales de l'entreprise</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Filiales</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Liste des filiales de l'entreprise</p>
+        </div>
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
+          <Plus className="h-4 w-4" /> Ajouter une filiale
+        </button>
       </div>
       <div className="mb-6">
         <div className="relative max-w-md">
@@ -100,9 +139,9 @@ function ListeFiliales() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <button title="Voir" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><Eye className="h-4 w-4" /></button>
-                        <button title="Modifier" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><Edit className="h-4 w-4" /></button>
-                        <button title="Archiver" className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Archive className="h-4 w-4" /></button>
+                        <button onClick={() => setViewFiliale(f)} title="Voir" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><Eye className="h-4 w-4" /></button>
+                        <button onClick={() => setEditFiliale({ ...f })} title="Modifier" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><Edit className="h-4 w-4" /></button>
+                        <button onClick={() => handleArchive(f.id)} title="Archiver" className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Archive className="h-4 w-4" /></button>
                       </div>
                     </td>
                   </tr>
@@ -112,6 +151,69 @@ function ListeFiliales() {
           </table>
         </div>
       </div>
+
+      {entrepriseId && <CreateFilialeDialog entrepriseId={entrepriseId} open={showAdd} onClose={() => setShowAdd(false)} onCreated={loadData} />}
+
+      {/* View Dialog */}
+      {viewFiliale && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-card-foreground">{viewFiliale.nom}</h2>
+              <button onClick={() => setViewFiliale(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div><p className="text-muted-foreground text-xs">Adresse</p><p className="mt-1 text-card-foreground">{[viewFiliale.adresse, viewFiliale.code_postal, viewFiliale.ville].filter(Boolean).join(", ") || "—"}</p></div>
+              <div><p className="text-muted-foreground text-xs">SIRET</p><p className="mt-1 font-mono text-card-foreground">{viewFiliale.siret || "—"}</p></div>
+              <div><p className="text-muted-foreground text-xs">N° TVA</p><p className="mt-1 text-card-foreground">{viewFiliale.numero_tva || "—"}</p></div>
+              <div><p className="text-muted-foreground text-xs">Responsable</p><p className="mt-1 text-card-foreground">{[viewFiliale.responsable_prenom, viewFiliale.responsable_nom].filter(Boolean).join(" ") || "—"}</p></div>
+              <div><p className="text-muted-foreground text-xs">Email resp.</p><p className="mt-1 text-card-foreground">{viewFiliale.responsable_email || "—"}</p></div>
+              <div><p className="text-muted-foreground text-xs">Tél. resp.</p><p className="mt-1 text-card-foreground">{viewFiliale.responsable_telephone || "—"}</p></div>
+              <div><p className="text-muted-foreground text-xs">Sites</p><p className="mt-1 font-bold text-card-foreground">{stats[viewFiliale.id]?.sites || 0}</p></div>
+              <div><p className="text-muted-foreground text-xs">Collaborateurs</p><p className="mt-1 font-bold text-card-foreground">{stats[viewFiliale.id]?.collabs || 0}</p></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Dialog */}
+      {editFiliale && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-card-foreground">Modifier la filiale</h2>
+              <button onClick={() => setEditFiliale(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div><label className="text-sm font-medium text-foreground">Nom</label><input className={inputCls} value={editFiliale.nom} onChange={e => setEditFiliale({ ...editFiliale, nom: e.target.value })} /></div>
+              <div><label className="text-sm font-medium text-foreground">Adresse</label><input className={inputCls} value={editFiliale.adresse || ""} onChange={e => setEditFiliale({ ...editFiliale, adresse: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-sm font-medium text-foreground">Code postal</label><input className={inputCls} value={editFiliale.code_postal || ""} onChange={e => setEditFiliale({ ...editFiliale, code_postal: e.target.value })} /></div>
+                <div><label className="text-sm font-medium text-foreground">Ville</label><input className={inputCls} value={editFiliale.ville || ""} onChange={e => setEditFiliale({ ...editFiliale, ville: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-sm font-medium text-foreground">SIRET</label><input className={inputCls} value={editFiliale.siret || ""} onChange={e => setEditFiliale({ ...editFiliale, siret: e.target.value })} /></div>
+                <div><label className="text-sm font-medium text-foreground">N° TVA</label><input className={inputCls} value={editFiliale.numero_tva || ""} onChange={e => setEditFiliale({ ...editFiliale, numero_tva: e.target.value })} /></div>
+              </div>
+              <div className="border-t border-border pt-4">
+                <p className="text-sm font-medium text-foreground mb-3">Responsable</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="text-sm text-muted-foreground">Nom</label><input className={inputCls} value={editFiliale.responsable_nom || ""} onChange={e => setEditFiliale({ ...editFiliale, responsable_nom: e.target.value })} /></div>
+                  <div><label className="text-sm text-muted-foreground">Prénom</label><input className={inputCls} value={editFiliale.responsable_prenom || ""} onChange={e => setEditFiliale({ ...editFiliale, responsable_prenom: e.target.value })} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div><label className="text-sm text-muted-foreground">Email</label><input className={inputCls} value={editFiliale.responsable_email || ""} onChange={e => setEditFiliale({ ...editFiliale, responsable_email: e.target.value })} /></div>
+                  <div><label className="text-sm text-muted-foreground">Téléphone</label><input className={inputCls} value={editFiliale.responsable_telephone || ""} onChange={e => setEditFiliale({ ...editFiliale, responsable_telephone: e.target.value })} /></div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setEditFiliale(null)} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">Annuler</button>
+                <button onClick={handleEditSave} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">Enregistrer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
