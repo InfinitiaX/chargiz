@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Search, Car } from "lucide-react";
+import CreateVehiculeDialog from "@/components/CreateVehiculeDialog";
+import { Plus, Search, Car, Edit, Trash2, X } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/vehicules")({
   component: VehiculesPage,
@@ -33,6 +34,8 @@ function VehiculesPage() {
   const [search, setSearch] = useState("");
   const [filterStatut, setFilterStatut] = useState("");
   const [filterAbo, setFilterAbo] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [editVeh, setEditVeh] = useState<Vehicule | null>(null);
 
   useEffect(() => {
     if (!entrepriseId) return;
@@ -40,10 +43,28 @@ function VehiculesPage() {
   }, [entrepriseId]);
 
   async function loadVehicules() {
-    let query = supabase.from("vehicules").select("*").eq("entreprise_id", entrepriseId);
-    const { data } = await query;
+    const { data } = await supabase.from("vehicules").select("*").eq("entreprise_id", entrepriseId);
     if (data) setVehicules(data as Vehicule[]);
   }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Voulez-vous supprimer ce véhicule ?")) return;
+    await supabase.from("vehicules").delete().eq("id", id);
+    loadVehicules();
+  };
+
+  const handleEditSave = async () => {
+    if (!editVeh) return;
+    await supabase.from("vehicules").update({
+      marque: editVeh.marque,
+      modele: editVeh.modele,
+      immatriculation: editVeh.immatriculation,
+      vin: editVeh.vin,
+      capacite_batterie: editVeh.capacite_batterie,
+    }).eq("id", editVeh.id);
+    setEditVeh(null);
+    loadVehicules();
+  };
 
   const filtered = vehicules.filter(v => {
     if (search && !`${v.marque} ${v.modele} ${v.immatriculation}`.toLowerCase().includes(search.toLowerCase())) return false;
@@ -52,6 +73,8 @@ function VehiculesPage() {
     return true;
   });
 
+  const inputCls = "w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
+
   return (
     <div className="p-8">
       <div className="mb-8 flex items-center justify-between">
@@ -59,7 +82,7 @@ function VehiculesPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Véhicules</h1>
           <p className="mt-1 text-sm text-muted-foreground">Flotte de véhicules électriques</p>
         </div>
-        <button className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-chargiz-teal-light">
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-chargiz-teal-light">
           <Plus className="h-4 w-4" /> Ajouter un véhicule
         </button>
       </div>
@@ -97,11 +120,12 @@ function VehiculesPage() {
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Batterie</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Smartcar</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Affectation</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Aucun véhicule</td></tr>
+                <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">Aucun véhicule</td></tr>
               ) : filtered.map(v => (
                 <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4">
@@ -133,12 +157,46 @@ function VehiculesPage() {
                       {v.statut_affectation === "affecte" ? "Affecté" : v.statut_affectation === "archive" ? "Archivé" : "Non affecté"}
                     </span>
                   </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setEditVeh({ ...v })} title="Modifier" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><Edit className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(v.id)} title="Supprimer" className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {entrepriseId && <CreateVehiculeDialog entrepriseId={entrepriseId} open={showAdd} onClose={() => setShowAdd(false)} onCreated={loadVehicules} />}
+
+      {editVeh && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-card-foreground">Modifier le véhicule</h2>
+              <button onClick={() => setEditVeh(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-sm font-medium text-foreground">Marque</label><input className={inputCls} value={editVeh.marque || ""} onChange={e => setEditVeh({ ...editVeh, marque: e.target.value })} /></div>
+                <div><label className="text-sm font-medium text-foreground">Modèle</label><input className={inputCls} value={editVeh.modele || ""} onChange={e => setEditVeh({ ...editVeh, modele: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-sm font-medium text-foreground">Immatriculation</label><input className={inputCls} value={editVeh.immatriculation || ""} onChange={e => setEditVeh({ ...editVeh, immatriculation: e.target.value })} /></div>
+                <div><label className="text-sm font-medium text-foreground">VIN</label><input className={inputCls} value={editVeh.vin || ""} onChange={e => setEditVeh({ ...editVeh, vin: e.target.value })} /></div>
+              </div>
+              <div><label className="text-sm font-medium text-foreground">Capacité batterie (kWh)</label><input type="number" step="0.1" className={inputCls} value={editVeh.capacite_batterie || ""} onChange={e => setEditVeh({ ...editVeh, capacite_batterie: e.target.value ? parseFloat(e.target.value) : null })} /></div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setEditVeh(null)} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">Annuler</button>
+                <button onClick={handleEditSave} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">Enregistrer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
