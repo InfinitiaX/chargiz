@@ -20,14 +20,14 @@ interface AdminUser {
 }
 
 function ListeAdmins() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    if (role !== "superadmin") return;
+    if (loading || role !== "superadmin") return;
     loadData();
-  }, [role]);
+  }, [loading, role]);
 
   async function loadData() {
     // Get admin & superadmin roles
@@ -55,6 +55,14 @@ function ListeAdmins() {
       }));
       setAdmins(merged);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
   }
 
   if (role !== "superadmin") {

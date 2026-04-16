@@ -20,16 +20,16 @@ interface Collab {
 }
 
 function ListeCollaborateurs() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
   const [collaborateurs, setCollaborateurs] = useState<Collab[]>([]);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    if (!entrepriseId) return;
+    if (loading || !entrepriseId) return;
     loadData();
-  }, [entrepriseId]);
+  }, [loading, entrepriseId]);
 
   async function loadData() {
     const { data } = await supabase.from("profiles").select("id, nom, prenom, email, is_active, created_at")
@@ -44,6 +44,14 @@ function ListeCollaborateurs() {
   };
 
   const filtered = collaborateurs.filter(c => !search || `${c.nom} ${c.prenom} ${c.email}`.toLowerCase().includes(search.toLowerCase()));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">

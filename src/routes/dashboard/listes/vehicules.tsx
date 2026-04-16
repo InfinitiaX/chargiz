@@ -23,7 +23,7 @@ interface Vehicule {
 }
 
 function ListeVehicules() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
   const [search, setSearch] = useState("");
@@ -33,9 +33,9 @@ function ListeVehicules() {
   const [editVeh, setEditVeh] = useState<Vehicule | null>(null);
 
   useEffect(() => {
-    if (!entrepriseId) return;
+    if (loading || !entrepriseId) return;
     loadVehicules();
-  }, [entrepriseId]);
+  }, [loading, entrepriseId]);
 
   async function loadVehicules() {
     const { data } = await supabase.from("vehicules").select("*").eq("entreprise_id", entrepriseId);
@@ -69,6 +69,14 @@ function ListeVehicules() {
   });
 
   const inputCls = "w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">

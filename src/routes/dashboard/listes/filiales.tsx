@@ -26,7 +26,7 @@ interface Filiale {
 }
 
 function ListeFiliales() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
   const [filiales, setFiliales] = useState<Filiale[]>([]);
   const [stats, setStats] = useState<Record<string, { sites: number; collabs: number }>>({});
@@ -36,9 +36,9 @@ function ListeFiliales() {
   const [viewFiliale, setViewFiliale] = useState<Filiale | null>(null);
 
   useEffect(() => {
-    if (!entrepriseId) return;
+    if (loading || !entrepriseId) return;
     loadData();
-  }, [entrepriseId]);
+  }, [loading, entrepriseId]);
 
   async function loadData() {
     const { data } = await supabase.from("filiales").select("*").eq("entreprise_id", entrepriseId).order("nom");
@@ -82,6 +82,14 @@ function ListeFiliales() {
 
   const filtered = filiales.filter(f => !search || `${f.nom} ${f.ville}`.toLowerCase().includes(search.toLowerCase()));
   const inputCls = "w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">
