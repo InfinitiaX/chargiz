@@ -66,9 +66,7 @@ function LoginPage() {
         </div>
         <div className="relative z-10 max-w-md text-center">
           <div className="mb-8 flex justify-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-accent">
-              <Zap className="h-10 w-10 text-accent-foreground" />
-            </div>
+            <img src={logoChargiz} alt="ChargiZ" className="h-24 w-auto drop-shadow-lg" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-primary-foreground">
             La recharge électrique,
