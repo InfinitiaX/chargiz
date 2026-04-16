@@ -24,7 +24,9 @@ import { Route as DashboardCollaborateursRouteImport } from './routes/dashboard/
 import { Route as DashboardListesVehiculesRouteImport } from './routes/dashboard/listes/vehicules'
 import { Route as DashboardListesSitesRouteImport } from './routes/dashboard/listes/sites'
 import { Route as DashboardListesFilialesRouteImport } from './routes/dashboard/listes/filiales'
+import { Route as DashboardListesEntreprisesRouteImport } from './routes/dashboard/listes/entreprises'
 import { Route as DashboardListesCollaborateursRouteImport } from './routes/dashboard/listes/collaborateurs'
+import { Route as DashboardListesAdminsRouteImport } from './routes/dashboard/listes/admins'
 import { Route as DashboardCollaborateursIdRouteImport } from './routes/dashboard/collaborateurs.$id'
 import { Route as DashboardListesVehiculesVehiculeIdRouteImport } from './routes/dashboard/listes/vehicules.$vehiculeId'
 
@@ -105,12 +107,23 @@ const DashboardListesFilialesRoute = DashboardListesFilialesRouteImport.update({
   path: '/filiales',
   getParentRoute: () => DashboardListesRoute,
 } as any)
+const DashboardListesEntreprisesRoute =
+  DashboardListesEntreprisesRouteImport.update({
+    id: '/entreprises',
+    path: '/entreprises',
+    getParentRoute: () => DashboardListesRoute,
+  } as any)
 const DashboardListesCollaborateursRoute =
   DashboardListesCollaborateursRouteImport.update({
     id: '/collaborateurs',
     path: '/collaborateurs',
     getParentRoute: () => DashboardListesRoute,
   } as any)
+const DashboardListesAdminsRoute = DashboardListesAdminsRouteImport.update({
+  id: '/admins',
+  path: '/admins',
+  getParentRoute: () => DashboardListesRoute,
+} as any)
 const DashboardCollaborateursIdRoute =
   DashboardCollaborateursIdRouteImport.update({
     id: '/$id',
@@ -138,7 +151,9 @@ export interface FileRoutesByFullPath {
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/collaborateurs/$id': typeof DashboardCollaborateursIdRoute
+  '/dashboard/listes/admins': typeof DashboardListesAdminsRoute
   '/dashboard/listes/collaborateurs': typeof DashboardListesCollaborateursRoute
+  '/dashboard/listes/entreprises': typeof DashboardListesEntreprisesRoute
   '/dashboard/listes/filiales': typeof DashboardListesFilialesRoute
   '/dashboard/listes/sites': typeof DashboardListesSitesRoute
   '/dashboard/listes/vehicules': typeof DashboardListesVehiculesRouteWithChildren
@@ -157,7 +172,9 @@ export interface FileRoutesByTo {
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/collaborateurs/$id': typeof DashboardCollaborateursIdRoute
+  '/dashboard/listes/admins': typeof DashboardListesAdminsRoute
   '/dashboard/listes/collaborateurs': typeof DashboardListesCollaborateursRoute
+  '/dashboard/listes/entreprises': typeof DashboardListesEntreprisesRoute
   '/dashboard/listes/filiales': typeof DashboardListesFilialesRoute
   '/dashboard/listes/sites': typeof DashboardListesSitesRoute
   '/dashboard/listes/vehicules': typeof DashboardListesVehiculesRouteWithChildren
@@ -178,7 +195,9 @@ export interface FileRoutesById {
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/collaborateurs/$id': typeof DashboardCollaborateursIdRoute
+  '/dashboard/listes/admins': typeof DashboardListesAdminsRoute
   '/dashboard/listes/collaborateurs': typeof DashboardListesCollaborateursRoute
+  '/dashboard/listes/entreprises': typeof DashboardListesEntreprisesRoute
   '/dashboard/listes/filiales': typeof DashboardListesFilialesRoute
   '/dashboard/listes/sites': typeof DashboardListesSitesRoute
   '/dashboard/listes/vehicules': typeof DashboardListesVehiculesRouteWithChildren
@@ -200,7 +219,9 @@ export interface FileRouteTypes {
     | '/dashboard/vehicules'
     | '/dashboard/'
     | '/dashboard/collaborateurs/$id'
+    | '/dashboard/listes/admins'
     | '/dashboard/listes/collaborateurs'
+    | '/dashboard/listes/entreprises'
     | '/dashboard/listes/filiales'
     | '/dashboard/listes/sites'
     | '/dashboard/listes/vehicules'
@@ -219,7 +240,9 @@ export interface FileRouteTypes {
     | '/dashboard/vehicules'
     | '/dashboard'
     | '/dashboard/collaborateurs/$id'
+    | '/dashboard/listes/admins'
     | '/dashboard/listes/collaborateurs'
+    | '/dashboard/listes/entreprises'
     | '/dashboard/listes/filiales'
     | '/dashboard/listes/sites'
     | '/dashboard/listes/vehicules'
@@ -239,7 +262,9 @@ export interface FileRouteTypes {
     | '/dashboard/vehicules'
     | '/dashboard/'
     | '/dashboard/collaborateurs/$id'
+    | '/dashboard/listes/admins'
     | '/dashboard/listes/collaborateurs'
+    | '/dashboard/listes/entreprises'
     | '/dashboard/listes/filiales'
     | '/dashboard/listes/sites'
     | '/dashboard/listes/vehicules'
@@ -359,11 +384,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardListesFilialesRouteImport
       parentRoute: typeof DashboardListesRoute
     }
+    '/dashboard/listes/entreprises': {
+      id: '/dashboard/listes/entreprises'
+      path: '/entreprises'
+      fullPath: '/dashboard/listes/entreprises'
+      preLoaderRoute: typeof DashboardListesEntreprisesRouteImport
+      parentRoute: typeof DashboardListesRoute
+    }
     '/dashboard/listes/collaborateurs': {
       id: '/dashboard/listes/collaborateurs'
       path: '/collaborateurs'
       fullPath: '/dashboard/listes/collaborateurs'
       preLoaderRoute: typeof DashboardListesCollaborateursRouteImport
+      parentRoute: typeof DashboardListesRoute
+    }
+    '/dashboard/listes/admins': {
+      id: '/dashboard/listes/admins'
+      path: '/admins'
+      fullPath: '/dashboard/listes/admins'
+      preLoaderRoute: typeof DashboardListesAdminsRouteImport
       parentRoute: typeof DashboardListesRoute
     }
     '/dashboard/collaborateurs/$id': {
@@ -413,14 +452,18 @@ const DashboardListesVehiculesRouteWithChildren =
   )
 
 interface DashboardListesRouteChildren {
+  DashboardListesAdminsRoute: typeof DashboardListesAdminsRoute
   DashboardListesCollaborateursRoute: typeof DashboardListesCollaborateursRoute
+  DashboardListesEntreprisesRoute: typeof DashboardListesEntreprisesRoute
   DashboardListesFilialesRoute: typeof DashboardListesFilialesRoute
   DashboardListesSitesRoute: typeof DashboardListesSitesRoute
   DashboardListesVehiculesRoute: typeof DashboardListesVehiculesRouteWithChildren
 }
 
 const DashboardListesRouteChildren: DashboardListesRouteChildren = {
+  DashboardListesAdminsRoute: DashboardListesAdminsRoute,
   DashboardListesCollaborateursRoute: DashboardListesCollaborateursRoute,
+  DashboardListesEntreprisesRoute: DashboardListesEntreprisesRoute,
   DashboardListesFilialesRoute: DashboardListesFilialesRoute,
   DashboardListesSitesRoute: DashboardListesSitesRoute,
   DashboardListesVehiculesRoute: DashboardListesVehiculesRouteWithChildren,
