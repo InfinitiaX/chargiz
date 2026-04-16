@@ -76,7 +76,7 @@ function DashboardHome() {
       .eq("entreprise_id", entrepriseId)
       .gte("date_debut", dateFrom)
       .lte("date_debut", dateTo + "T23:59:59");
-    if (sess) setSessions(sess);
+    if (sess) setSessions(sess.map(s => ({ collaborateur_id: s.collaborateur_id, energie_kwh: s.energie_kwh ?? 0, is_domicile: s.is_domicile ?? false, cout_euro: s.cout_euro ?? 0, kilometrage: s.kilometrage ?? 0, co2_evite: s.co2_evite ?? 0 })));
   }
 
   const totalSessions = sessions.length;

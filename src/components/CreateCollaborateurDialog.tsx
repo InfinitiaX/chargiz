@@ -37,7 +37,7 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
       supabase.from("vehicules").select("id, marque, modele, immatriculation, statut_smartcar")
         .eq("entreprise_id", entrepriseId)
         .eq("statut_affectation", "non_affecte")
-        .then(({ data }) => { if (data) setVehiculesLibres(data); });
+        .then(({ data }) => { if (data) setVehiculesLibres(data.map(v => ({ id: v.id, marque: v.marque ?? '', modele: v.modele ?? '', immatriculation: v.immatriculation ?? '', statut_smartcar: v.statut_smartcar ?? '' }))); });
     }
   }, [open, entrepriseId]);
 
