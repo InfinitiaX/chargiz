@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import logoDark from "@/assets/logo-dark.jpg";
+import logoChargiz from "@/assets/logo-chargiz.png";
 import { Lock, CheckCircle } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({

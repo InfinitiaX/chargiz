@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
-import logoWhite from "@/assets/logo-white.jpg";
+import logoChargiz from "@/assets/logo-chargiz.png";
 import { useState } from "react";
 import {
   LayoutDashboard,

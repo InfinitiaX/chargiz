@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import logoDark from "@/assets/logo-dark.jpg";
+import logoChargiz from "@/assets/logo-chargiz.png";
 import { useState } from "react";
 import { Eye, EyeOff, Zap } from "lucide-react";
 import { supabase } from "@/lib/supabase";
