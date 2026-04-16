@@ -85,7 +85,7 @@ function LoginPage() {
       <div className="flex w-full items-center justify-center bg-background px-6 lg:w-1/2">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
-            <img src={logoDark} alt="ChargiZ" className="mx-auto h-12 w-auto" />
+            <img src={logoChargiz} alt="ChargiZ" className="mx-auto h-12 w-auto" />
             <h2 className="mt-8 text-2xl font-bold tracking-tight text-foreground">
               {forgotMode ? "Mot de passe oublié" : "Connexion à votre espace"}
             </h2>
