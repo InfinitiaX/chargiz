@@ -28,6 +28,10 @@ interface CollabRow {
   site_id: string | null;
 }
 
+interface VehiculeMap {
+  [collaborateurId: string]: string; // immatriculation
+}
+
 function DashboardHome() {
   const { profile } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
