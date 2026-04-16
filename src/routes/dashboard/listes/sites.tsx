@@ -25,7 +25,7 @@ interface Site {
 }
 
 function ListeSites() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
   const [sites, setSites] = useState<Site[]>([]);
   const [filiales, setFiliales] = useState<Record<string, string>>({});

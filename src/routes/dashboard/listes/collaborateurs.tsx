@@ -20,7 +20,7 @@ interface Collab {
 }
 
 function ListeCollaborateurs() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
   const [collaborateurs, setCollaborateurs] = useState<Collab[]>([]);
   const [search, setSearch] = useState("");

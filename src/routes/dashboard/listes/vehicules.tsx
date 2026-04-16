@@ -23,7 +23,7 @@ interface Vehicule {
 }
 
 function ListeVehicules() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
   const [search, setSearch] = useState("");

@@ -26,7 +26,7 @@ interface Filiale {
 }
 
 function ListeFiliales() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
   const [filiales, setFiliales] = useState<Filiale[]>([]);
   const [stats, setStats] = useState<Record<string, { sites: number; collabs: number }>>({});
