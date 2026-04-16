@@ -9,8 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VehiculesRouteImport } from './routes/vehicules'
+import { Route as StatistiquesRouteImport } from './routes/statistiques'
+import { Route as SitesRouteImport } from './routes/sites'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ReglagesRouteImport } from './routes/reglages'
+import { Route as MesInfosRouteImport } from './routes/mes-infos'
+import { Route as MesConsommationsRouteImport } from './routes/mes-consommations'
+import { Route as FilialesRouteImport } from './routes/filiales'
+import { Route as EntreprisesRouteImport } from './routes/entreprises'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CollaborateursRouteImport } from './routes/collaborateurs'
+import { Route as AdminsRouteImport } from './routes/admins'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardVehiculesRouteImport } from './routes/dashboard/vehicules'
@@ -30,14 +40,64 @@ import { Route as DashboardListesAdminsRouteImport } from './routes/dashboard/li
 import { Route as DashboardCollaborateursIdRouteImport } from './routes/dashboard/collaborateurs.$id'
 import { Route as DashboardListesVehiculesVehiculeIdRouteImport } from './routes/dashboard/listes/vehicules.$vehiculeId'
 
+const VehiculesRoute = VehiculesRouteImport.update({
+  id: '/vehicules',
+  path: '/vehicules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatistiquesRoute = StatistiquesRouteImport.update({
+  id: '/statistiques',
+  path: '/statistiques',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitesRoute = SitesRouteImport.update({
+  id: '/sites',
+  path: '/sites',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReglagesRoute = ReglagesRouteImport.update({
+  id: '/reglages',
+  path: '/reglages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MesInfosRoute = MesInfosRouteImport.update({
+  id: '/mes-infos',
+  path: '/mes-infos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MesConsommationsRoute = MesConsommationsRouteImport.update({
+  id: '/mes-consommations',
+  path: '/mes-consommations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilialesRoute = FilialesRouteImport.update({
+  id: '/filiales',
+  path: '/filiales',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EntreprisesRoute = EntreprisesRouteImport.update({
+  id: '/entreprises',
+  path: '/entreprises',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollaborateursRoute = CollaborateursRouteImport.update({
+  id: '/collaborateurs',
+  path: '/collaborateurs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminsRoute = AdminsRouteImport.update({
+  id: '/admins',
+  path: '/admins',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -139,8 +199,18 @@ const DashboardListesVehiculesVehiculeIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admins': typeof AdminsRoute
+  '/collaborateurs': typeof CollaborateursRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/entreprises': typeof EntreprisesRoute
+  '/filiales': typeof FilialesRoute
+  '/mes-consommations': typeof MesConsommationsRoute
+  '/mes-infos': typeof MesInfosRoute
+  '/reglages': typeof ReglagesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sites': typeof SitesRoute
+  '/statistiques': typeof StatistiquesRoute
+  '/vehicules': typeof VehiculesRoute
   '/dashboard/collaborateurs': typeof DashboardCollaborateursRouteWithChildren
   '/dashboard/entreprises': typeof DashboardEntreprisesRoute
   '/dashboard/listes': typeof DashboardListesRouteWithChildren
@@ -161,7 +231,17 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admins': typeof AdminsRoute
+  '/collaborateurs': typeof CollaborateursRoute
+  '/entreprises': typeof EntreprisesRoute
+  '/filiales': typeof FilialesRoute
+  '/mes-consommations': typeof MesConsommationsRoute
+  '/mes-infos': typeof MesInfosRoute
+  '/reglages': typeof ReglagesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sites': typeof SitesRoute
+  '/statistiques': typeof StatistiquesRoute
+  '/vehicules': typeof VehiculesRoute
   '/dashboard/collaborateurs': typeof DashboardCollaborateursRouteWithChildren
   '/dashboard/entreprises': typeof DashboardEntreprisesRoute
   '/dashboard/listes': typeof DashboardListesRouteWithChildren
@@ -183,8 +263,18 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admins': typeof AdminsRoute
+  '/collaborateurs': typeof CollaborateursRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/entreprises': typeof EntreprisesRoute
+  '/filiales': typeof FilialesRoute
+  '/mes-consommations': typeof MesConsommationsRoute
+  '/mes-infos': typeof MesInfosRoute
+  '/reglages': typeof ReglagesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sites': typeof SitesRoute
+  '/statistiques': typeof StatistiquesRoute
+  '/vehicules': typeof VehiculesRoute
   '/dashboard/collaborateurs': typeof DashboardCollaborateursRouteWithChildren
   '/dashboard/entreprises': typeof DashboardEntreprisesRoute
   '/dashboard/listes': typeof DashboardListesRouteWithChildren
@@ -207,8 +297,18 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admins'
+    | '/collaborateurs'
     | '/dashboard'
+    | '/entreprises'
+    | '/filiales'
+    | '/mes-consommations'
+    | '/mes-infos'
+    | '/reglages'
     | '/reset-password'
+    | '/sites'
+    | '/statistiques'
+    | '/vehicules'
     | '/dashboard/collaborateurs'
     | '/dashboard/entreprises'
     | '/dashboard/listes'
@@ -229,7 +329,17 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admins'
+    | '/collaborateurs'
+    | '/entreprises'
+    | '/filiales'
+    | '/mes-consommations'
+    | '/mes-infos'
+    | '/reglages'
     | '/reset-password'
+    | '/sites'
+    | '/statistiques'
+    | '/vehicules'
     | '/dashboard/collaborateurs'
     | '/dashboard/entreprises'
     | '/dashboard/listes'
@@ -250,8 +360,18 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admins'
+    | '/collaborateurs'
     | '/dashboard'
+    | '/entreprises'
+    | '/filiales'
+    | '/mes-consommations'
+    | '/mes-infos'
+    | '/reglages'
     | '/reset-password'
+    | '/sites'
+    | '/statistiques'
+    | '/vehicules'
     | '/dashboard/collaborateurs'
     | '/dashboard/entreprises'
     | '/dashboard/listes'
@@ -273,12 +393,43 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminsRoute: typeof AdminsRoute
+  CollaborateursRoute: typeof CollaborateursRoute
   DashboardRoute: typeof DashboardRouteWithChildren
+  EntreprisesRoute: typeof EntreprisesRoute
+  FilialesRoute: typeof FilialesRoute
+  MesConsommationsRoute: typeof MesConsommationsRoute
+  MesInfosRoute: typeof MesInfosRoute
+  ReglagesRoute: typeof ReglagesRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SitesRoute: typeof SitesRoute
+  StatistiquesRoute: typeof StatistiquesRoute
+  VehiculesRoute: typeof VehiculesRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/vehicules': {
+      id: '/vehicules'
+      path: '/vehicules'
+      fullPath: '/vehicules'
+      preLoaderRoute: typeof VehiculesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/statistiques': {
+      id: '/statistiques'
+      path: '/statistiques'
+      fullPath: '/statistiques'
+      preLoaderRoute: typeof StatistiquesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sites': {
+      id: '/sites'
+      path: '/sites'
+      fullPath: '/sites'
+      preLoaderRoute: typeof SitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
@@ -286,11 +437,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reglages': {
+      id: '/reglages'
+      path: '/reglages'
+      fullPath: '/reglages'
+      preLoaderRoute: typeof ReglagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mes-infos': {
+      id: '/mes-infos'
+      path: '/mes-infos'
+      fullPath: '/mes-infos'
+      preLoaderRoute: typeof MesInfosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mes-consommations': {
+      id: '/mes-consommations'
+      path: '/mes-consommations'
+      fullPath: '/mes-consommations'
+      preLoaderRoute: typeof MesConsommationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/filiales': {
+      id: '/filiales'
+      path: '/filiales'
+      fullPath: '/filiales'
+      preLoaderRoute: typeof FilialesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/entreprises': {
+      id: '/entreprises'
+      path: '/entreprises'
+      fullPath: '/entreprises'
+      preLoaderRoute: typeof EntreprisesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collaborateurs': {
+      id: '/collaborateurs'
+      path: '/collaborateurs'
+      fullPath: '/collaborateurs'
+      preLoaderRoute: typeof CollaborateursRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admins': {
+      id: '/admins'
+      path: '/admins'
+      fullPath: '/admins'
+      preLoaderRoute: typeof AdminsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -503,9 +703,28 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminsRoute: AdminsRoute,
+  CollaborateursRoute: CollaborateursRoute,
   DashboardRoute: DashboardRouteWithChildren,
+  EntreprisesRoute: EntreprisesRoute,
+  FilialesRoute: FilialesRoute,
+  MesConsommationsRoute: MesConsommationsRoute,
+  MesInfosRoute: MesInfosRoute,
+  ReglagesRoute: ReglagesRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SitesRoute: SitesRoute,
+  StatistiquesRoute: StatistiquesRoute,
+  VehiculesRoute: VehiculesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
