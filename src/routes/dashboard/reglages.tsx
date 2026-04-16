@@ -54,7 +54,7 @@ function ReglagesPage() {
     };
 
     if (politique && (politique as Record<string, unknown>).id) {
-      await supabase.from("politiques_recharge").update(data).eq("id", (politique as Record<string, unknown>).id);
+      await supabase.from("politiques_recharge").update(data).eq("id", (politique as Record<string, unknown>).id as string);
     } else {
       await supabase.from("politiques_recharge").insert(data);
     }
