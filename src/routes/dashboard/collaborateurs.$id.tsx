@@ -109,9 +109,15 @@ function CollaborateurFiche() {
 
   const totalDomicile = sessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
   const totalHors = sessions.filter(s => !s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
+  const coutDomicile = sessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.cout_euro || 0), 0);
   const totalKm = sessions.reduce((a, s) => a + (s.kilometrage || 0), 0);
-  const consoMoyenne = totalKm > 0 ? ((totalDomicile + totalHors) / totalKm * 100) : 0;
-  const co2Evite = (totalDomicile + totalHors) * 0.05;
+  // Consommation moyenne = énergie totale / km total × 100 (kWh/100km)
+  const totalEnergie = totalDomicile + totalHors;
+  const consoMoyenne = totalKm > 0 ? (totalEnergie / totalKm * 100) : 0;
+  // CO₂ évité = km × (émission thermique - émission EV) en kg
+  // Facteur thermique moyen France : 0,193 kgCO₂/km | Facteur EV : 0,047 kgCO₂/km
+  const co2Evite = totalKm > 0 ? totalKm * (0.193 - 0.047) : 0;
+  const hasEnoughData = totalKm > 0 && totalEnergie > 0;
   const sessionsDomicile = sessions.filter(s => s.is_domicile);
 
   const handleRevoke = async (vehiculeAction: "sortir" | "garder", abonnement?: "continuer" | "suspendre") => {
@@ -255,24 +261,31 @@ function CollaborateurFiche() {
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="rounded-lg border border-input bg-background px-3 py-1.5 text-xs" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
             <div className="rounded-lg bg-muted/50 p-4 text-center">
               <p className="text-2xl font-bold text-chargiz-teal">{totalDomicile.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">kWh domicile</p>
+              <p className="text-xs text-muted-foreground mt-1">kWh domicile</p>
+            </div>
+            <div className="rounded-lg bg-muted/50 p-4 text-center">
+              <p className="text-2xl font-bold text-chargiz-teal">{coutDomicile.toFixed(2)} €</p>
+              <p className="text-xs text-muted-foreground mt-1">€ domicile</p>
             </div>
             <div className="rounded-lg bg-muted/50 p-4 text-center">
               <p className="text-2xl font-bold text-chargiz-lime-dark">{totalHors.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">kWh hors domicile</p>
+              <p className="text-xs text-muted-foreground mt-1">kWh hors domicile</p>
             </div>
             <div className="rounded-lg bg-muted/50 p-4 text-center">
-              <p className="text-2xl font-bold text-foreground">{consoMoyenne.toFixed(1)}</p>
-              <p className="text-xs text-muted-foreground">kWh/100km</p>
+              <p className="text-2xl font-bold text-foreground">{hasEnoughData ? consoMoyenne.toFixed(1) : "—"}</p>
+              <p className="text-xs text-muted-foreground mt-1">kWh/100km (moy.)</p>
             </div>
             <div className="rounded-lg bg-muted/50 p-4 text-center">
-              <p className="text-2xl font-bold text-foreground">{co2Evite.toFixed(1)} kg</p>
-              <p className="text-xs text-muted-foreground">CO₂ évité</p>
+              <p className="text-2xl font-bold text-foreground">{hasEnoughData ? `${co2Evite.toFixed(1)}` : "—"}</p>
+              <p className="text-xs text-muted-foreground mt-1">kg CO₂ évité (est.)</p>
             </div>
           </div>
+          {!hasEnoughData && sessions.length > 0 && (
+            <p className="mt-3 text-xs text-muted-foreground italic">⚠ Données de distance insuffisantes pour calculer la consommation moyenne et le CO₂ évité.</p>
+          )}
         </div>
 
         {/* Bloc sessions domicile */}
