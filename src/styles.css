@@ -59,7 +59,7 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   /* ChargiZ Brand Colors */
   --chargiz-teal: oklch(0.38 0.06 190);
   --chargiz-teal-light: oklch(0.45 0.06 190);
@@ -74,8 +74,8 @@
   --kpi-away: oklch(0.55 0.15 310);
 
   /* Semantic Tokens - Light */
-  --background: oklch(0.985 0.002 250);
-  --foreground: oklch(0.20 0.04 220);
+  --background: oklch(0.99 0.01 105);
+  --foreground: oklch(0.145 0.04 220);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.20 0.04 220);
   --popover: oklch(1 0 0);
