@@ -33,9 +33,30 @@ function ListeCollaborateurs() {
   }, [loading, entrepriseId]);
 
   async function loadData() {
-    const { data } = await supabase.from("profiles").select("id, nom, prenom, email, is_active, created_at")
-      .eq("entreprise_id", entrepriseId).order("nom");
-    if (data) setCollaborateurs(data);
+    // 1. Récupérer les profils de l'entreprise
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, user_id, nom, prenom, email, is_active, created_at")
+      .eq("entreprise_id", entrepriseId)
+      .order("nom");
+    if (!profiles) return;
+
+    // 2. Récupérer les rôles pour exclure les admins/gestionnaires
+    const userIds = profiles.map(p => p.user_id).filter(Boolean) as string[];
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
+
+    const nonCollabUsers = new Set(
+      (roles || [])
+        .filter(r => r.role !== "collaborateur")
+        .map(r => r.user_id)
+    );
+
+    // 3. Garder uniquement les collaborateurs (rôle "collaborateur" ou sans rôle = invités)
+    const collabsOnly = profiles.filter(p => !p.user_id || !nonCollabUsers.has(p.user_id));
+    setCollaborateurs(collabsOnly);
   }
 
   const handleArchive = async (id: string) => {
