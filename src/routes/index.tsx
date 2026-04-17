@@ -60,12 +60,12 @@ function LoginPage() {
   return (
     <div className="flex min-h-screen">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col items-center justify-start p-12">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col items-center justify-center p-12">
         <img src={loginHero} alt="Borne de recharge ChargiZ" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-primary via-primary/80 to-primary/30" />
-        <div className="relative z-10 max-w-md text-center pt-8">
+        <div className="relative z-10 max-w-md text-center">
           <div className="mb-8 flex justify-center">
-            <img src={logoChargiz} alt="ChargiZ" className="h-24 w-auto drop-shadow-lg" />
+            <img src={logoChargiz} alt="ChargiZ" className="h-14 w-auto drop-shadow-lg" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-primary-foreground">
             La recharge électrique,
@@ -82,8 +82,7 @@ function LoginPage() {
       <div className="flex w-full items-center justify-center bg-background px-6 lg:w-1/2">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
-            <img src={logoChargiz} alt="ChargiZ" className="mx-auto h-12 w-auto" />
-            <h2 className="mt-8 text-2xl font-bold tracking-tight text-foreground">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">
               {forgotMode ? "Mot de passe oublié" : "Connexion à votre espace"}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
