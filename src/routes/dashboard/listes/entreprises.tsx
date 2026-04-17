@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import CreateEntrepriseDialog from "@/components/CreateEntrepriseDialog";
-import { Plus, Search, Eye, Archive } from "lucide-react";
+import { Plus, Search, Eye, Archive, Download } from "lucide-react";
+import { exportCSV } from "@/lib/export";
 
 export const Route = createFileRoute("/dashboard/listes/entreprises")({
   component: ListeEntreprises,
@@ -67,9 +68,17 @@ function ListeEntreprises() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Entreprises</h1>
           <p className="mt-1 text-sm text-muted-foreground">Liste de toutes les entreprises</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
-          <Plus className="h-4 w-4" /> Ajouter une entreprise
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => exportCSV("entreprises", filtered.map(e => ({
+            Nom: e.nom, SIREN: e.siren || "", SIRET: e.siret || "", Ville: e.ville || "", Email: e.email || "",
+            "Date création": new Date(e.created_at).toLocaleDateString("fr-FR"),
+          })))} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
+            <Download className="h-4 w-4" /> Exporter
+          </button>
+          <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
+            <Plus className="h-4 w-4" /> Ajouter une entreprise
+          </button>
+        </div>
       </div>
 
       <div className="mb-6">
