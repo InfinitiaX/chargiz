@@ -185,6 +185,17 @@ export default function DashboardSidebar() {
           </div>
         )}
 
+        {/* Administration (Superadmin + Admin) */}
+        {(role === "superadmin" || role === "admin") && (
+          <Link to="/dashboard/administration"
+            className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all ${
+              location.pathname.startsWith("/dashboard/administration") ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            }`}>
+            <ShieldCheck className="h-5 w-5" />
+            Administration
+          </Link>
+        )}
+
         {/* Réglages */}
         <Link to="/dashboard/reglages"
           className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all ${
