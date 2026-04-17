@@ -500,7 +500,7 @@ function ConducteurDashboard() {
   const { profile } = useAuth();
   const [vehicule, setVehicule] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
-  const [stats, setStats] = useState({ energieTotal: 0, coutTotal: 0, co2Evite: 0, km: 0, nbSessions: 0 });
+  const [stats, setStats] = useState({ energieTotal: 0, coutTotal: 0, energieDomicile: 0, coutRemboursable: 0, co2Evite: 0, km: 0, nbSessions: 0 });
 
   useEffect(() => { if (profile) loadData(); }, [profile]);
 
@@ -518,6 +518,8 @@ function ConducteurDashboard() {
     setStats({
       energieTotal: sessData.reduce((a, s) => a + (s.energie_kwh || 0), 0),
       coutTotal: sessData.reduce((a, s) => a + (s.cout_euro || 0), 0),
+      energieDomicile: sessData.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0),
+      coutRemboursable: sessData.filter(s => s.is_domicile).reduce((a, s) => a + (s.cout_euro || 0), 0),
       co2Evite: km * 0.146,
       km,
       nbSessions: sessData.length,
@@ -531,12 +533,13 @@ function ConducteurDashboard() {
         <p className="mt-1 text-sm text-muted-foreground">Votre activité de recharge individuelle</p>
       </div>
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard title="Sessions" value={String(stats.nbSessions)} icon={Zap} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
-        <KpiCard title="Énergie (kWh)" value={stats.energieTotal.toFixed(1)} icon={Battery} colorClass="bg-kpi-energy/10 text-kpi-energy" />
-        <KpiCard title="Coût total" value={`${stats.coutTotal.toFixed(2)} €`} icon={Euro} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
-        <KpiCard title="CO₂ évité" value={`${stats.co2Evite.toFixed(0)} kg`} icon={Leaf} colorClass="bg-kpi-home/10 text-kpi-home" />
-        <KpiCard title="Km parcourus" value={stats.km.toFixed(0)} icon={TrendingUp} colorClass="bg-kpi-away/10 text-kpi-away" />
+        <KpiCard title="Énergie totale" value={`${stats.energieTotal.toFixed(1)} kWh`} icon={Battery} colorClass="bg-kpi-energy/10 text-kpi-energy" />
+        <KpiCard title="kWh domicile" value={`${stats.energieDomicile.toFixed(1)} kWh`} icon={Home} colorClass="bg-kpi-home/10 text-kpi-home" />
+        <KpiCard title="€ remboursable" value={`${stats.coutRemboursable.toFixed(2)} €`} icon={Euro} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
+        <KpiCard title="CO₂ évité" value={`${stats.co2Evite.toFixed(0)} kg`} icon={Leaf} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
+        <KpiCard title="Km parcourus" value={`${stats.km.toFixed(0)} km`} icon={TrendingUp} colorClass="bg-kpi-away/10 text-kpi-away" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
