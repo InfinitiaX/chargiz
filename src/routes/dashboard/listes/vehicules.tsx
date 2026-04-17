@@ -135,7 +135,7 @@ function ListeVehicules() {
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Immat</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Batterie</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Statut</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Smartcar</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Abonnement</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
