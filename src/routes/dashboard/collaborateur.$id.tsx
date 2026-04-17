@@ -6,7 +6,7 @@ import {
   Edit, UserX, Unlink, Download, Send, Calendar
 } from "lucide-react";
 
-export const Route = createFileRoute("/dashboard/collaborateurs/$id")({
+export const Route = createFileRoute("/dashboard/collaborateur/$id")({
   component: CollaborateurFiche,
   head: () => ({
     meta: [
