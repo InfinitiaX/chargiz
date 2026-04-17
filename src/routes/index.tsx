@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import logoChargiz from "@/assets/logo-chargiz.png";
+import loginHero from "@/assets/login-hero.png";
 import { useState } from "react";
-import { Eye, EyeOff, Zap } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/")({
@@ -59,12 +60,10 @@ function LoginPage() {
   return (
     <div className="flex min-h-screen">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary relative overflow-hidden flex-col items-center justify-center p-12">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-10 h-64 w-64 rounded-full bg-accent blur-3xl" />
-          <div className="absolute bottom-20 right-10 h-80 w-80 rounded-full bg-accent blur-3xl" />
-        </div>
-        <div className="relative z-10 max-w-md text-center">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col items-center justify-end p-12">
+        <img src={loginHero} alt="Borne de recharge ChargiZ" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/70 to-primary/10" />
+        <div className="relative z-10 max-w-md text-center pb-8">
           <div className="mb-8 flex justify-center">
             <img src={logoChargiz} alt="ChargiZ" className="h-24 w-auto drop-shadow-lg" />
           </div>
@@ -73,7 +72,7 @@ function LoginPage() {
             <br />
             <span className="text-accent">simplifiée.</span>
           </h1>
-          <p className="mt-6 text-lg text-primary-foreground/70 leading-relaxed">
+          <p className="mt-6 text-lg text-primary-foreground/90 leading-relaxed">
             Suivez, gérez et remboursez les recharges de véhicules électriques de vos collaborateurs en toute simplicité.
           </p>
         </div>

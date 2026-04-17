@@ -98,7 +98,7 @@ function ListeCollaborateurs() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <Link to="/dashboard/collaborateurs/$id" params={{ id: c.id }}
+                      <Link to="/dashboard/collaborateur/$id" params={{ id: c.id }}
                         className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Voir fiche">
                         <Eye className="h-4 w-4" />
                       </Link>

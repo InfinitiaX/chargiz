@@ -95,7 +95,7 @@ function CollaborateursPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <Link to="/dashboard/collaborateurs/$id" params={{ id: c.id }} className="text-sm font-medium text-primary hover:underline">
+                    <Link to="/dashboard/collaborateur/$id" params={{ id: c.id }} className="text-sm font-medium text-primary hover:underline">
                       Voir fiche
                     </Link>
                   </td>

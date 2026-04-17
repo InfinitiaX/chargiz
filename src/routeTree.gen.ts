@@ -37,7 +37,7 @@ import { Route as DashboardListesFilialesRouteImport } from './routes/dashboard/
 import { Route as DashboardListesEntreprisesRouteImport } from './routes/dashboard/listes/entreprises'
 import { Route as DashboardListesCollaborateursRouteImport } from './routes/dashboard/listes/collaborateurs'
 import { Route as DashboardListesAdminsRouteImport } from './routes/dashboard/listes/admins'
-import { Route as DashboardCollaborateursIdRouteImport } from './routes/dashboard/collaborateurs.$id'
+import { Route as DashboardCollaborateurIdRouteImport } from './routes/dashboard/collaborateur.$id'
 import { Route as DashboardListesVehiculesVehiculeIdRouteImport } from './routes/dashboard/listes/vehicules.$vehiculeId'
 
 const VehiculesRoute = VehiculesRouteImport.update({
@@ -184,11 +184,11 @@ const DashboardListesAdminsRoute = DashboardListesAdminsRouteImport.update({
   path: '/admins',
   getParentRoute: () => DashboardListesRoute,
 } as any)
-const DashboardCollaborateursIdRoute =
-  DashboardCollaborateursIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => DashboardCollaborateursRoute,
+const DashboardCollaborateurIdRoute =
+  DashboardCollaborateurIdRouteImport.update({
+    id: '/collaborateur/$id',
+    path: '/collaborateur/$id',
+    getParentRoute: () => DashboardRoute,
   } as any)
 const DashboardListesVehiculesVehiculeIdRoute =
   DashboardListesVehiculesVehiculeIdRouteImport.update({
@@ -211,7 +211,7 @@ export interface FileRoutesByFullPath {
   '/sites': typeof SitesRoute
   '/statistiques': typeof StatistiquesRoute
   '/vehicules': typeof VehiculesRoute
-  '/dashboard/collaborateurs': typeof DashboardCollaborateursRouteWithChildren
+  '/dashboard/collaborateurs': typeof DashboardCollaborateursRoute
   '/dashboard/entreprises': typeof DashboardEntreprisesRoute
   '/dashboard/listes': typeof DashboardListesRouteWithChildren
   '/dashboard/mes-consommations': typeof DashboardMesConsommationsRoute
@@ -220,7 +220,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/statistiques': typeof DashboardStatistiquesRoute
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
   '/dashboard/': typeof DashboardIndexRoute
-  '/dashboard/collaborateurs/$id': typeof DashboardCollaborateursIdRoute
+  '/dashboard/collaborateur/$id': typeof DashboardCollaborateurIdRoute
   '/dashboard/listes/admins': typeof DashboardListesAdminsRoute
   '/dashboard/listes/collaborateurs': typeof DashboardListesCollaborateursRoute
   '/dashboard/listes/entreprises': typeof DashboardListesEntreprisesRoute
@@ -242,7 +242,7 @@ export interface FileRoutesByTo {
   '/sites': typeof SitesRoute
   '/statistiques': typeof StatistiquesRoute
   '/vehicules': typeof VehiculesRoute
-  '/dashboard/collaborateurs': typeof DashboardCollaborateursRouteWithChildren
+  '/dashboard/collaborateurs': typeof DashboardCollaborateursRoute
   '/dashboard/entreprises': typeof DashboardEntreprisesRoute
   '/dashboard/listes': typeof DashboardListesRouteWithChildren
   '/dashboard/mes-consommations': typeof DashboardMesConsommationsRoute
@@ -251,7 +251,7 @@ export interface FileRoutesByTo {
   '/dashboard/statistiques': typeof DashboardStatistiquesRoute
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
   '/dashboard': typeof DashboardIndexRoute
-  '/dashboard/collaborateurs/$id': typeof DashboardCollaborateursIdRoute
+  '/dashboard/collaborateur/$id': typeof DashboardCollaborateurIdRoute
   '/dashboard/listes/admins': typeof DashboardListesAdminsRoute
   '/dashboard/listes/collaborateurs': typeof DashboardListesCollaborateursRoute
   '/dashboard/listes/entreprises': typeof DashboardListesEntreprisesRoute
@@ -275,7 +275,7 @@ export interface FileRoutesById {
   '/sites': typeof SitesRoute
   '/statistiques': typeof StatistiquesRoute
   '/vehicules': typeof VehiculesRoute
-  '/dashboard/collaborateurs': typeof DashboardCollaborateursRouteWithChildren
+  '/dashboard/collaborateurs': typeof DashboardCollaborateursRoute
   '/dashboard/entreprises': typeof DashboardEntreprisesRoute
   '/dashboard/listes': typeof DashboardListesRouteWithChildren
   '/dashboard/mes-consommations': typeof DashboardMesConsommationsRoute
@@ -284,7 +284,7 @@ export interface FileRoutesById {
   '/dashboard/statistiques': typeof DashboardStatistiquesRoute
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
   '/dashboard/': typeof DashboardIndexRoute
-  '/dashboard/collaborateurs/$id': typeof DashboardCollaborateursIdRoute
+  '/dashboard/collaborateur/$id': typeof DashboardCollaborateurIdRoute
   '/dashboard/listes/admins': typeof DashboardListesAdminsRoute
   '/dashboard/listes/collaborateurs': typeof DashboardListesCollaborateursRoute
   '/dashboard/listes/entreprises': typeof DashboardListesEntreprisesRoute
@@ -318,7 +318,7 @@ export interface FileRouteTypes {
     | '/dashboard/statistiques'
     | '/dashboard/vehicules'
     | '/dashboard/'
-    | '/dashboard/collaborateurs/$id'
+    | '/dashboard/collaborateur/$id'
     | '/dashboard/listes/admins'
     | '/dashboard/listes/collaborateurs'
     | '/dashboard/listes/entreprises'
@@ -349,7 +349,7 @@ export interface FileRouteTypes {
     | '/dashboard/statistiques'
     | '/dashboard/vehicules'
     | '/dashboard'
-    | '/dashboard/collaborateurs/$id'
+    | '/dashboard/collaborateur/$id'
     | '/dashboard/listes/admins'
     | '/dashboard/listes/collaborateurs'
     | '/dashboard/listes/entreprises'
@@ -381,7 +381,7 @@ export interface FileRouteTypes {
     | '/dashboard/statistiques'
     | '/dashboard/vehicules'
     | '/dashboard/'
-    | '/dashboard/collaborateurs/$id'
+    | '/dashboard/collaborateur/$id'
     | '/dashboard/listes/admins'
     | '/dashboard/listes/collaborateurs'
     | '/dashboard/listes/entreprises'
@@ -605,12 +605,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardListesAdminsRouteImport
       parentRoute: typeof DashboardListesRoute
     }
-    '/dashboard/collaborateurs/$id': {
-      id: '/dashboard/collaborateurs/$id'
-      path: '/$id'
-      fullPath: '/dashboard/collaborateurs/$id'
-      preLoaderRoute: typeof DashboardCollaborateursIdRouteImport
-      parentRoute: typeof DashboardCollaborateursRoute
+    '/dashboard/collaborateur/$id': {
+      id: '/dashboard/collaborateur/$id'
+      path: '/collaborateur/$id'
+      fullPath: '/dashboard/collaborateur/$id'
+      preLoaderRoute: typeof DashboardCollaborateurIdRouteImport
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/listes/vehicules/$vehiculeId': {
       id: '/dashboard/listes/vehicules/$vehiculeId'
@@ -621,20 +621,6 @@ declare module '@tanstack/react-router' {
     }
   }
 }
-
-interface DashboardCollaborateursRouteChildren {
-  DashboardCollaborateursIdRoute: typeof DashboardCollaborateursIdRoute
-}
-
-const DashboardCollaborateursRouteChildren: DashboardCollaborateursRouteChildren =
-  {
-    DashboardCollaborateursIdRoute: DashboardCollaborateursIdRoute,
-  }
-
-const DashboardCollaborateursRouteWithChildren =
-  DashboardCollaborateursRoute._addFileChildren(
-    DashboardCollaborateursRouteChildren,
-  )
 
 interface DashboardListesVehiculesRouteChildren {
   DashboardListesVehiculesVehiculeIdRoute: typeof DashboardListesVehiculesVehiculeIdRoute
@@ -674,7 +660,7 @@ const DashboardListesRouteWithChildren = DashboardListesRoute._addFileChildren(
 )
 
 interface DashboardRouteChildren {
-  DashboardCollaborateursRoute: typeof DashboardCollaborateursRouteWithChildren
+  DashboardCollaborateursRoute: typeof DashboardCollaborateursRoute
   DashboardEntreprisesRoute: typeof DashboardEntreprisesRoute
   DashboardListesRoute: typeof DashboardListesRouteWithChildren
   DashboardMesConsommationsRoute: typeof DashboardMesConsommationsRoute
@@ -683,10 +669,11 @@ interface DashboardRouteChildren {
   DashboardStatistiquesRoute: typeof DashboardStatistiquesRoute
   DashboardVehiculesRoute: typeof DashboardVehiculesRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
+  DashboardCollaborateurIdRoute: typeof DashboardCollaborateurIdRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
-  DashboardCollaborateursRoute: DashboardCollaborateursRouteWithChildren,
+  DashboardCollaborateursRoute: DashboardCollaborateursRoute,
   DashboardEntreprisesRoute: DashboardEntreprisesRoute,
   DashboardListesRoute: DashboardListesRouteWithChildren,
   DashboardMesConsommationsRoute: DashboardMesConsommationsRoute,
@@ -695,6 +682,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardStatistiquesRoute: DashboardStatistiquesRoute,
   DashboardVehiculesRoute: DashboardVehiculesRoute,
   DashboardIndexRoute: DashboardIndexRoute,
+  DashboardCollaborateurIdRoute: DashboardCollaborateurIdRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
