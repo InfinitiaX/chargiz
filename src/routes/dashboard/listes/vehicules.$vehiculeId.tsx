@@ -44,46 +44,77 @@ function FicheVehicule() {
   const [vehicule, setVehicule] = useState<Vehicule | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [currentCollab, setCurrentCollab] = useState<{ nom: string; prenom: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehiculeId]);
 
   async function loadData() {
-    const { data: v } = await supabase.from("vehicules").select("*").eq("id", vehiculeId).single();
-    if (v) {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: v, error: vErr } = await supabase.from("vehicules").select("*").eq("id", vehiculeId).maybeSingle();
+      if (vErr) throw vErr;
+      if (!v) {
+        setError("Véhicule introuvable");
+        setLoading(false);
+        return;
+      }
       setVehicule(v as Vehicule);
       if (v.collaborateur_id) {
-        const { data: p } = await supabase.from("profiles").select("nom, prenom").eq("id", v.collaborateur_id).single();
+        const { data: p } = await supabase.from("profiles").select("nom, prenom").eq("id", v.collaborateur_id).maybeSingle();
         if (p) setCurrentCollab(p);
       }
-    }
 
-    const { data: sess } = await supabase.from("sessions_recharge").select("id, collaborateur_id, jour_semaine, date_debut, energie_kwh, cout_euro, kilometrage")
-      .eq("vehicule_id", vehiculeId)
-      .order("date_debut", { ascending: false })
-      .limit(50);
+      const { data: sess } = await supabase.from("sessions_recharge")
+        .select("id, collaborateur_id, jour_semaine, date_debut, energie_kwh, cout_euro, kilometrage")
+        .eq("vehicule_id", vehiculeId)
+        .order("date_debut", { ascending: false })
+        .limit(50);
 
-    if (sess) {
-      const collabIds = [...new Set(sess.map(s => s.collaborateur_id))];
-      const { data: profiles } = await supabase.from("profiles").select("id, nom, prenom").in("id", collabIds);
-      const profileMap: Record<string, { nom: string; prenom: string }> = {};
-      if (profiles) profiles.forEach(p => { profileMap[p.id] = p; });
-
-      setSessions(sess.map(s => ({
-        id: s.id,
-        collaborateur_nom: profileMap[s.collaborateur_id]?.nom || "—",
-        collaborateur_prenom: profileMap[s.collaborateur_id]?.prenom || "",
-        jour_semaine: s.jour_semaine,
-        date_debut: s.date_debut,
-        energie_kwh: s.energie_kwh,
-        cout_euro: s.cout_euro,
-        kilometrage: s.kilometrage,
-      })));
+      if (sess && sess.length > 0) {
+        const collabIds = [...new Set(sess.map(s => s.collaborateur_id).filter(Boolean))];
+        const profileMap: Record<string, { nom: string; prenom: string }> = {};
+        if (collabIds.length > 0) {
+          const { data: profiles } = await supabase.from("profiles").select("id, nom, prenom").in("id", collabIds);
+          if (profiles) profiles.forEach(p => { profileMap[p.id] = p; });
+        }
+        setSessions(sess.map(s => ({
+          id: s.id,
+          collaborateur_nom: profileMap[s.collaborateur_id]?.nom || "—",
+          collaborateur_prenom: profileMap[s.collaborateur_id]?.prenom || "",
+          jour_semaine: s.jour_semaine,
+          date_debut: s.date_debut,
+          energie_kwh: s.energie_kwh,
+          cout_euro: s.cout_euro,
+          kilometrage: s.kilometrage,
+        })));
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur de chargement");
+    } finally {
+      setLoading(false);
     }
   }
 
-  if (!vehicule) return <div className="flex items-center justify-center h-64"><div className="animate-pulse text-muted-foreground">Chargement...</div></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+    </div>
+  );
+  if (error || !vehicule) return (
+    <div className="p-8">
+      <Link to="/dashboard/listes/vehicules" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
+        <ArrowLeft className="h-4 w-4" /> Retour aux véhicules
+      </Link>
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-destructive">
+        {error || "Véhicule introuvable"}
+      </div>
+    </div>
+  );
 
   return (
     <div className="p-8">
