@@ -53,7 +53,10 @@ function MesInfosPage() {
 
   const handleSave = async () => {
     if (!profile) return;
-    const updates: Record<string, unknown> = { ...form };
+    const updates: {
+      nom: string; prenom: string; telephone: string; adresse: string; code_postal: string; ville: string;
+      cout_kwh_domicile?: number | null; jours_suivi?: string[];
+    } = { ...form };
     if (politiqueDeleguee) {
       updates.cout_kwh_domicile = politique.cout_kwh_domicile === "" ? null : Number(politique.cout_kwh_domicile);
       updates.jours_suivi = politique.jours_suivi;
