@@ -115,11 +115,20 @@ export function useAuth() {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    cache.userId = undefined;
+    cache.role = undefined;
+    cache.profile = undefined;
     setUser(null);
     setSession(null);
     setRole(null);
     setProfile(null);
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn("signOut error", e);
+    }
+    // Force un reset complet de l'app pour éviter tout état résiduel
+    window.location.href = "/";
   };
 
   const resetPassword = async (email: string) => {
