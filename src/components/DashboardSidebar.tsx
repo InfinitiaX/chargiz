@@ -87,8 +87,8 @@ export default function DashboardSidebar() {
 
     return (
       <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground">
-        <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-6">
-          <img src={logoChargiz} alt="ChargiZ" className="h-10 w-auto" />
+        <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-6">
+          <img src={logoChargiz} alt="ChargiZ" className="h-7 w-auto" />
         </div>
         {profile && (
           <div className="border-b border-sidebar-border px-4 py-3">
@@ -129,8 +129,8 @@ export default function DashboardSidebar() {
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-6">
-        <img src={logoChargiz} alt="ChargiZ" className="h-10 w-auto" />
+      <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-6">
+        <img src={logoChargiz} alt="ChargiZ" className="h-7 w-auto" />
       </div>
 
       {profile && (
