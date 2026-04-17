@@ -10,17 +10,23 @@ export const Route = createFileRoute("/dashboard/mes-infos")({
 });
 
 function MesInfosPage() {
-  const { profile, role } = useAuth();
+  const { profile } = useAuth();
   const [vehicule, setVehicule] = useState<Record<string, unknown> | null>(null);
   const [entrepriseNom, setEntrepriseNom] = useState("");
   const [filialeNom, setFilialeNom] = useState("");
   const [siteNom, setSiteNom] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({ nom: "", prenom: "", telephone: "", adresse: "", code_postal: "", ville: "" });
+  const [politique, setPolitique] = useState({ cout_kwh_domicile: "" as string | number, jours_suivi: [] as string[] });
+  const [politiqueDeleguee, setPolitiqueDeleguee] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
     setForm({ nom: profile.nom, prenom: profile.prenom, telephone: profile.telephone || "", adresse: profile.adresse || "", code_postal: profile.code_postal || "", ville: profile.ville || "" });
+    setPolitique({
+      cout_kwh_domicile: profile.cout_kwh_domicile ?? "",
+      jours_suivi: Array.isArray(profile.jours_suivi) ? profile.jours_suivi : [],
+    });
     loadExtras();
   }, [profile]);
 
@@ -40,19 +46,42 @@ function MesInfosPage() {
     }
     const { data: v } = await supabase.from("vehicules").select("*").eq("collaborateur_id", profile.id).limit(1).maybeSingle();
     if (v) setVehicule(v);
+    // Politique individuelle = délégation au collaborateur
+    const { data: pol } = await supabase.from("politiques_recharge").select("id").eq("collaborateur_id", profile.id).limit(1).maybeSingle();
+    setPolitiqueDeleguee(!!pol);
   }
 
   const handleSave = async () => {
     if (!profile) return;
-    await supabase.from("profiles").update(form).eq("id", profile.id);
+    const updates: {
+      nom: string; prenom: string; telephone: string; adresse: string; code_postal: string; ville: string;
+      cout_kwh_domicile?: number | null; jours_suivi?: string[];
+    } = { ...form };
+    if (politiqueDeleguee) {
+      updates.cout_kwh_domicile = politique.cout_kwh_domicile === "" ? null : Number(politique.cout_kwh_domicile);
+      updates.jours_suivi = politique.jours_suivi;
+    }
+    await supabase.from("profiles").update(updates).eq("id", profile.id);
     setEditMode(false);
+    window.location.reload();
+  };
+
+  const toggleJour = (j: string) => {
+    setPolitique(p => ({
+      ...p,
+      jours_suivi: p.jours_suivi.includes(j) ? p.jours_suivi.filter(x => x !== j) : [...p.jours_suivi, j],
+    }));
   };
 
   const inputCls = "w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
+  const greyedCls = "w-full rounded-lg border border-input bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground cursor-not-allowed";
 
   if (!profile) return <div className="flex items-center justify-center h-64"><div className="animate-pulse text-muted-foreground">Chargement...</div></div>;
 
-  const jours = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+  const jours = [
+    { key: "lun", label: "Lun" }, { key: "mar", label: "Mar" }, { key: "mer", label: "Mer" },
+    { key: "jeu", label: "Jeu" }, { key: "ven", label: "Ven" }, { key: "sam", label: "Sam" }, { key: "dim", label: "Dim" },
+  ];
 
   return (
     <div className="p-8 max-w-4xl">
@@ -89,9 +118,19 @@ function MesInfosPage() {
                 <div className="col-span-2"><p className="text-muted-foreground">Adresse</p><p className="font-medium text-card-foreground">{[profile.adresse, profile.code_postal, profile.ville].filter(Boolean).join(", ") || "—"}</p></div>
               </>
             )}
-            <div><p className="text-muted-foreground">Entreprise</p><p className="font-medium text-card-foreground opacity-60">{entrepriseNom || "—"}</p></div>
-            <div><p className="text-muted-foreground">Filiale</p><p className="font-medium text-card-foreground opacity-60">{filialeNom || "—"}</p></div>
-            <div><p className="text-muted-foreground">Site</p><p className="font-medium text-card-foreground opacity-60">{siteNom || "—"}</p></div>
+            {/* Champs grisés (non modifiables) */}
+            <div>
+              <label className="text-muted-foreground text-xs">Entreprise <span className="text-[10px] uppercase">(non modifiable)</span></label>
+              <input value={entrepriseNom || "—"} disabled className={greyedCls} />
+            </div>
+            <div>
+              <label className="text-muted-foreground text-xs">Filiale <span className="text-[10px] uppercase">(non modifiable)</span></label>
+              <input value={filialeNom || "—"} disabled className={greyedCls} />
+            </div>
+            <div>
+              <label className="text-muted-foreground text-xs">Site <span className="text-[10px] uppercase">(non modifiable)</span></label>
+              <input value={siteNom || "—"} disabled className={greyedCls} />
+            </div>
           </div>
           {editMode && (
             <div className="mt-4 flex gap-2">
@@ -103,15 +142,37 @@ function MesInfosPage() {
 
         {/* Politique de recharge */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-card-foreground mb-4"><Shield className="h-5 w-5 text-primary" /> Politique de recharge</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-card-foreground"><Shield className="h-5 w-5 text-primary" /> Politique de recharge</h3>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${politiqueDeleguee ? "bg-chargiz-teal/10 text-chargiz-teal" : "bg-muted text-muted-foreground"}`}>
+              {politiqueDeleguee ? "Délégué — modifiable" : "Géré par l'entreprise"}
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <div><p className="text-muted-foreground">Coût kWh domicile</p><p className="font-medium text-card-foreground">{profile.cout_kwh_domicile ? `${profile.cout_kwh_domicile} €` : "—"}</p></div>
             <div>
-              <p className="text-muted-foreground mb-2">Jours de suivi</p>
-              <div className="flex gap-1.5">
+              <label className="text-muted-foreground text-xs">Coût kWh domicile (€)</label>
+              {editMode && politiqueDeleguee ? (
+                <input type="number" step="0.001" value={politique.cout_kwh_domicile}
+                  onChange={e => setPolitique({ ...politique, cout_kwh_domicile: e.target.value })} className={inputCls} />
+              ) : (
+                <input value={profile.cout_kwh_domicile ? `${profile.cout_kwh_domicile} €` : "—"} disabled className={greyedCls} />
+              )}
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs mb-2">Jours de recharge éligibles</p>
+              <div className="flex gap-1.5 flex-wrap">
                 {jours.map(j => {
-                  const active = Array.isArray(profile.jours_suivi) && profile.jours_suivi.includes(j.toLowerCase());
-                  return <span key={j} className={`rounded-md px-2 py-0.5 text-xs font-medium ${active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>{j}</span>;
+                  const active = editMode && politiqueDeleguee
+                    ? politique.jours_suivi.includes(j.key)
+                    : Array.isArray(profile.jours_suivi) && profile.jours_suivi.includes(j.key);
+                  const clickable = editMode && politiqueDeleguee;
+                  return (
+                    <button key={j.key} type="button" disabled={!clickable}
+                      onClick={() => clickable && toggleJour(j.key)}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition ${active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"} ${clickable ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}>
+                      {j.label}
+                    </button>
+                  );
                 })}
               </div>
             </div>
