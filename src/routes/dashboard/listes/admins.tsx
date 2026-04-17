@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Search, Eye, Archive } from "lucide-react";
+import { Plus, Search, Eye, Archive, Download } from "lucide-react";
+import { exportCSV } from "@/lib/export";
 
 export const Route = createFileRoute("/dashboard/listes/admins")({
   component: ListeAdmins,
@@ -84,6 +85,13 @@ function ListeAdmins() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Admins</h1>
           <p className="mt-1 text-sm text-muted-foreground">Liste des administrateurs de la plateforme</p>
         </div>
+        <button onClick={() => exportCSV("admins", filtered.map(a => ({
+          Nom: a.nom, Prénom: a.prenom, Email: a.email, Rôle: a.role,
+          État: a.is_active ? "Actif" : "Inactif",
+          "Date création": new Date(a.created_at).toLocaleDateString("fr-FR"),
+        })))} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
+          <Download className="h-4 w-4" /> Exporter
+        </button>
       </div>
 
       <div className="mb-6">
