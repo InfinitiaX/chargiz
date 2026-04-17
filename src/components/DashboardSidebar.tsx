@@ -185,8 +185,8 @@ export default function DashboardSidebar() {
           </div>
         )}
 
-        {/* Administration (Superadmin + Admin) */}
-        {(role === "superadmin" || role === "admin") && (
+        {/* Administration (tous rôles managers — actions filtrées par rôle) */}
+        {role && (
           <Link to="/dashboard/administration"
             className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all ${
               location.pathname.startsWith("/dashboard/administration") ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
