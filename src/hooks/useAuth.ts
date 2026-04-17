@@ -31,31 +31,48 @@ export interface Profile {
   is_active: boolean;
 }
 
+// Cache simple en mémoire pour éviter les refetch role/profile à chaque montage
+const cache: { userId?: string; role?: AppRole | null; profile?: Profile | null } = {};
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [role, setRole] = useState<AppRole | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<AppRole | null>(cache.role ?? null);
+  const [profile, setProfile] = useState<Profile | null>(cache.profile ?? null);
+  const [loading, setLoading] = useState(!cache.userId);
 
   const fetchRole = useCallback(async (userId: string) => {
+    if (cache.userId === userId && cache.role !== undefined) {
+      setRole(cache.role);
+      return;
+    }
     const { data } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
       .limit(1)
-      .single();
-    if (data) setRole(data.role as AppRole);
+      .maybeSingle();
+    const r = (data?.role as AppRole) ?? null;
+    cache.userId = userId;
+    cache.role = r;
+    setRole(r);
   }, []);
 
   const fetchProfile = useCallback(async (userId: string) => {
+    if (cache.userId === userId && cache.profile !== undefined) {
+      setProfile(cache.profile);
+      return;
+    }
     const { data } = await supabase
       .from("profiles")
       .select("*")
       .eq("user_id", userId)
       .limit(1)
-      .single();
-    if (data) setProfile(data as Profile);
+      .maybeSingle();
+    const p = (data as Profile) ?? null;
+    cache.userId = userId;
+    cache.profile = p;
+    setProfile(p);
   }, []);
 
   useEffect(() => {
