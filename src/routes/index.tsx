@@ -60,10 +60,10 @@ function LoginPage() {
   return (
     <div className="flex min-h-screen">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col items-center justify-end p-12">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col items-center justify-start p-12">
         <img src={loginHero} alt="Borne de recharge ChargiZ" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/70 to-primary/10" />
-        <div className="relative z-10 max-w-md text-center pb-8">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary via-primary/80 to-primary/30" />
+        <div className="relative z-10 max-w-md text-center pt-8">
           <div className="mb-8 flex justify-center">
             <img src={logoChargiz} alt="ChargiZ" className="h-24 w-auto drop-shadow-lg" />
           </div>
