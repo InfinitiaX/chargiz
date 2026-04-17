@@ -37,8 +37,19 @@ function CollaborateursPage() {
   }, [entrepriseId]);
 
   async function loadCollabs() {
-    const { data } = await supabase.from("profiles").select("id, nom, prenom, email, site_id, is_active").eq("entreprise_id", entrepriseId).order("nom");
-    if (data) setCollaborateurs(data);
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, user_id, nom, prenom, email, site_id, is_active")
+      .eq("entreprise_id", entrepriseId)
+      .order("nom");
+    if (!profiles) return;
+    const userIds = profiles.map(p => p.user_id).filter(Boolean) as string[];
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
+    const nonCollab = new Set((roles || []).filter(r => r.role !== "collaborateur").map(r => r.user_id));
+    setCollaborateurs(profiles.filter(p => !p.user_id || !nonCollab.has(p.user_id)));
   }
 
   const filtered = collaborateurs.filter(c =>
