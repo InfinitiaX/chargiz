@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Calendar, Download } from "lucide-react";
+import { exportJustificatifPDF, exportCSV } from "@/lib/export";
 
 export const Route = createFileRoute("/dashboard/mes-consommations")({
   component: MesConsommationsPage,
@@ -54,8 +55,25 @@ function MesConsommationsPage() {
             <span className="text-xs text-muted-foreground">À</span>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-transparent text-xs outline-none" />
           </div>
-          <button className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
-            <Download className="h-4 w-4" /> Télécharger PDF
+          <button
+            onClick={() => exportCSV(`consommations_${dateFrom}_${dateTo}`, sessions.map(s => ({
+              Date: s.date_debut ? new Date(s.date_debut).toLocaleDateString("fr-FR") : "",
+              Jour: s.jour_semaine || "",
+              "Kilométrage (km)": s.kilometrage ?? "",
+              "Énergie (kWh)": s.energie_kwh ?? "",
+              "Coût (€)": s.cout_euro ?? "",
+            })))}
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
+            <Download className="h-4 w-4" /> Exporter CSV
+          </button>
+          <button
+            onClick={() => profile && exportJustificatifPDF({
+              collaborateur: { nom: profile.nom, prenom: profile.prenom, email: profile.email },
+              periode: { from: dateFrom, to: dateTo },
+              sessions,
+            })}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
+            <Download className="h-4 w-4" /> Justificatif PDF
           </button>
         </div>
       </div>
