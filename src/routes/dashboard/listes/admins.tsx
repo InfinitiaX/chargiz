@@ -68,7 +68,7 @@ function ListeAdmins() {
 
   if (role !== "superadmin") {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 md:p-8">
         <p className="text-muted-foreground">Accès réservé au SuperAdmin.</p>
       </div>
     );
@@ -79,10 +79,10 @@ function ListeAdmins() {
   );
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Admins</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Admins</h1>
           <p className="mt-1 text-sm text-muted-foreground">Liste des administrateurs de la plateforme</p>
         </div>
         <button onClick={() => exportCSV("admins", filtered.map(a => ({

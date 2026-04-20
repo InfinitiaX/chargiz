@@ -155,14 +155,14 @@ function CollaborateurFiche() {
   const jours = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       {/* Header */}
       <div className="mb-6 flex items-center gap-4">
         <Link to="/dashboard/collaborateurs" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" /> Retour
         </Link>
       </div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
             <User className="h-7 w-7 text-primary" />
@@ -191,7 +191,7 @@ function CollaborateurFiche() {
           <h3 className="flex items-center gap-2 text-lg font-semibold text-card-foreground mb-4">
             <User className="h-5 w-5 text-primary" /> Identité
           </h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div><p className="text-muted-foreground">Nom</p><p className="font-medium text-card-foreground">{profile.nom}</p></div>
             <div><p className="text-muted-foreground">Prénom</p><p className="font-medium text-card-foreground">{profile.prenom}</p></div>
             <div><p className="text-muted-foreground">Email</p><p className="font-medium text-card-foreground">{profile.email}</p></div>
@@ -218,7 +218,7 @@ function CollaborateurFiche() {
 
         {/* Bloc véhicule */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
             <h3 className="flex items-center gap-2 text-lg font-semibold text-card-foreground">
               <Car className="h-5 w-5 text-primary" /> Véhicule
             </h3>
@@ -229,7 +229,7 @@ function CollaborateurFiche() {
             )}
           </div>
           {vehicule ? (
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><p className="text-muted-foreground">Marque</p><p className="font-medium text-card-foreground">{vehicule.marque || "—"}</p></div>
               <div><p className="text-muted-foreground">Modèle</p><p className="font-medium text-card-foreground">{vehicule.modele || "—"}</p></div>
               <div><p className="text-muted-foreground">VIN</p><p className="font-medium font-mono text-xs text-card-foreground">{vehicule.vin || "—"}</p></div>
@@ -250,7 +250,7 @@ function CollaborateurFiche() {
 
         {/* Bloc statistiques */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
             <h3 className="flex items-center gap-2 text-lg font-semibold text-card-foreground">
               <BarChart3 className="h-5 w-5 text-primary" /> Statistiques
             </h3>

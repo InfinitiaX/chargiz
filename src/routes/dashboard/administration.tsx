@@ -308,13 +308,13 @@ function AdministrationPage() {
   }
 
   if (!role) {
-    return <div className="p-8"><p className="text-muted-foreground">Accès non autorisé.</p></div>;
+    return <div className="p-4 sm:p-6 md:p-8"><p className="text-muted-foreground">Accès non autorisé.</p></div>;
   }
 
   const groups = getGroupsForRole(role);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-primary" />

@@ -51,7 +51,7 @@ function ListeEntreprises() {
 
   if (!canAccess) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 md:p-8">
         <p className="text-muted-foreground">Accès réservé aux SuperAdmin et Admin.</p>
       </div>
     );
@@ -62,13 +62,13 @@ function ListeEntreprises() {
   );
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Entreprises</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Entreprises</h1>
           <p className="mt-1 text-sm text-muted-foreground">Liste de toutes les entreprises</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button onClick={() => exportCSV("entreprises", filtered.map(e => ({
             Nom: e.nom, SIREN: e.siren || "", SIRET: e.siret || "", Ville: e.ville || "", Email: e.email || "",
             "Date création": new Date(e.created_at).toLocaleDateString("fr-FR"),

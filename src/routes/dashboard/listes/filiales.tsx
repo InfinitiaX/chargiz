@@ -93,13 +93,13 @@ function ListeFiliales() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Filiales</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Filiales</h1>
           <p className="mt-1 text-sm text-muted-foreground">Liste des filiales de l'entreprise</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button onClick={() => exportCSV("filiales", filtered.map(f => ({
             Nom: f.nom, Adresse: f.adresse || "", Ville: f.ville || "", "Code postal": f.code_postal || "",
             SIRET: f.siret || "", "TVA": f.numero_tva || "",
@@ -143,7 +143,7 @@ function ListeFiliales() {
                 return (
                   <tr key={f.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                           <Building2 className="h-4 w-4 text-primary" />
                         </div>
@@ -178,11 +178,11 @@ function ListeFiliales() {
       {viewFiliale && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
               <h2 className="text-lg font-semibold text-card-foreground">{viewFiliale.nom}</h2>
               <button onClick={() => setViewFiliale(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><p className="text-muted-foreground text-xs">Adresse</p><p className="mt-1 text-card-foreground">{[viewFiliale.adresse, viewFiliale.code_postal, viewFiliale.ville].filter(Boolean).join(", ") || "—"}</p></div>
               <div><p className="text-muted-foreground text-xs">SIRET</p><p className="mt-1 font-mono text-card-foreground">{viewFiliale.siret || "—"}</p></div>
               <div><p className="text-muted-foreground text-xs">N° TVA</p><p className="mt-1 text-card-foreground">{viewFiliale.numero_tva || "—"}</p></div>
@@ -200,28 +200,28 @@ function ListeFiliales() {
       {editFiliale && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
               <h2 className="text-lg font-semibold text-card-foreground">Modifier la filiale</h2>
               <button onClick={() => setEditFiliale(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
               <div><label className="text-sm font-medium text-foreground">Nom</label><input className={inputCls} value={editFiliale.nom} onChange={e => setEditFiliale({ ...editFiliale, nom: e.target.value })} /></div>
               <div><label className="text-sm font-medium text-foreground">Adresse</label><input className={inputCls} value={editFiliale.adresse || ""} onChange={e => setEditFiliale({ ...editFiliale, adresse: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-sm font-medium text-foreground">Code postal</label><input className={inputCls} value={editFiliale.code_postal || ""} onChange={e => setEditFiliale({ ...editFiliale, code_postal: e.target.value })} /></div>
                 <div><label className="text-sm font-medium text-foreground">Ville</label><input className={inputCls} value={editFiliale.ville || ""} onChange={e => setEditFiliale({ ...editFiliale, ville: e.target.value })} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-sm font-medium text-foreground">SIRET</label><input className={inputCls} value={editFiliale.siret || ""} onChange={e => setEditFiliale({ ...editFiliale, siret: e.target.value })} /></div>
                 <div><label className="text-sm font-medium text-foreground">N° TVA</label><input className={inputCls} value={editFiliale.numero_tva || ""} onChange={e => setEditFiliale({ ...editFiliale, numero_tva: e.target.value })} /></div>
               </div>
               <div className="border-t border-border pt-4">
                 <p className="text-sm font-medium text-foreground mb-3">Responsable</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className="text-sm text-muted-foreground">Nom</label><input className={inputCls} value={editFiliale.responsable_nom || ""} onChange={e => setEditFiliale({ ...editFiliale, responsable_nom: e.target.value })} /></div>
                   <div><label className="text-sm text-muted-foreground">Prénom</label><input className={inputCls} value={editFiliale.responsable_prenom || ""} onChange={e => setEditFiliale({ ...editFiliale, responsable_prenom: e.target.value })} /></div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                   <div><label className="text-sm text-muted-foreground">Email</label><input className={inputCls} value={editFiliale.responsable_email || ""} onChange={e => setEditFiliale({ ...editFiliale, responsable_email: e.target.value })} /></div>
                   <div><label className="text-sm text-muted-foreground">Téléphone</label><input className={inputCls} value={editFiliale.responsable_telephone || ""} onChange={e => setEditFiliale({ ...editFiliale, responsable_telephone: e.target.value })} /></div>
                 </div>

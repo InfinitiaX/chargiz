@@ -97,9 +97,9 @@ function ReglagesPage() {
   const isGestSite = role === "gestionnaire_site";
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Réglages</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Réglages</h1>
         <p className="mt-1 text-sm text-muted-foreground">Paramètres de l'entreprise et politique de recharge</p>
       </div>
 
@@ -111,7 +111,7 @@ function ReglagesPage() {
             <h3 className="text-lg font-semibold text-card-foreground">Informations entreprise</h3>
           </div>
           <div className="p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><label className="text-muted-foreground text-xs">Dénomination</label><p className="mt-1 font-medium text-card-foreground">{(entreprise.nom as string) || "—"}</p></div>
               <div><label className="text-muted-foreground text-xs">SIREN</label><p className="mt-1 font-mono text-card-foreground">{(entreprise.siren as string) || "—"}</p></div>
               <div><label className="text-muted-foreground text-xs">SIRET</label><p className="mt-1 font-mono text-card-foreground">{(entreprise.siret as string) || "—"}</p></div>
@@ -130,7 +130,7 @@ function ReglagesPage() {
               <User className="h-5 w-5 text-primary" />
               <h3 className="text-lg font-semibold text-card-foreground">Responsable filiale</h3>
             </div>
-            <div className="p-6 grid grid-cols-2 gap-4 text-sm">
+            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><label className="text-muted-foreground text-xs">Nom</label><p className="mt-1 font-medium text-card-foreground">{filiale.responsable_nom || "—"}</p></div>
               <div><label className="text-muted-foreground text-xs">Prénom</label><p className="mt-1 text-card-foreground">{filiale.responsable_prenom || "—"}</p></div>
               <div><label className="text-muted-foreground text-xs">Téléphone</label><p className="mt-1 text-card-foreground">{filiale.responsable_telephone || "—"}</p></div>
@@ -145,7 +145,7 @@ function ReglagesPage() {
               <User className="h-5 w-5 text-primary" />
               <h3 className="text-lg font-semibold text-card-foreground">Responsable site</h3>
             </div>
-            <div className="p-6 grid grid-cols-2 gap-4 text-sm">
+            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><label className="text-muted-foreground text-xs">Nom</label><p className="mt-1 font-medium text-card-foreground">{site.responsable_nom || "—"}</p></div>
               <div><label className="text-muted-foreground text-xs">Prénom</label><p className="mt-1 text-card-foreground">{site.responsable_prenom || "—"}</p></div>
               <div><label className="text-muted-foreground text-xs">Téléphone</label><p className="mt-1 text-card-foreground">{site.responsable_telephone || "—"}</p></div>
@@ -160,7 +160,7 @@ function ReglagesPage() {
             <User className="h-5 w-5 text-primary" />
             <h3 className="text-lg font-semibold text-card-foreground">Mon compte</h3>
           </div>
-          <div className="p-6 grid grid-cols-2 gap-4 text-sm">
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div><label className="text-muted-foreground text-xs">Nom</label><p className="mt-1 text-card-foreground">{profile?.nom} {profile?.prenom}</p></div>
             <div><label className="text-muted-foreground text-xs">Email</label><p className="mt-1 text-card-foreground">{profile?.email || user?.email}</p></div>
             <div><label className="text-muted-foreground text-xs">Rôle</label><p className="mt-1 capitalize text-card-foreground">{role?.replace(/_/g, " ") || "—"}</p></div>

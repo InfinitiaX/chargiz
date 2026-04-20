@@ -80,13 +80,13 @@ function ListeVehicules() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Véhicules</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Véhicules</h1>
           <p className="mt-1 text-sm text-muted-foreground">Flotte de véhicules électriques</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button onClick={() => exportCSV("vehicules", filtered.map(v => ({
             Marque: v.marque || "", Modèle: v.modele || "", VIN: v.vin || "",
             Immatriculation: v.immatriculation || "",
@@ -187,16 +187,16 @@ function ListeVehicules() {
       {editVeh && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
               <h2 className="text-lg font-semibold text-card-foreground">Modifier le véhicule</h2>
               <button onClick={() => setEditVeh(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-sm font-medium text-foreground">Marque</label><input className={inputCls} value={editVeh.marque || ""} onChange={e => setEditVeh({ ...editVeh, marque: e.target.value })} /></div>
                 <div><label className="text-sm font-medium text-foreground">Modèle</label><input className={inputCls} value={editVeh.modele || ""} onChange={e => setEditVeh({ ...editVeh, modele: e.target.value })} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-sm font-medium text-foreground">Immatriculation</label><input className={inputCls} value={editVeh.immatriculation || ""} onChange={e => setEditVeh({ ...editVeh, immatriculation: e.target.value })} /></div>
                 <div><label className="text-sm font-medium text-foreground">VIN</label><input className={inputCls} value={editVeh.vin || ""} onChange={e => setEditVeh({ ...editVeh, vin: e.target.value })} /></div>
               </div>

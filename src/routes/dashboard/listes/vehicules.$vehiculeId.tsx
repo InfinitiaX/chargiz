@@ -106,7 +106,7 @@ function FicheVehicule() {
     </div>
   );
   if (error || !vehicule) return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <Link to="/dashboard/listes/vehicules" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
         <ArrowLeft className="h-4 w-4" /> Retour aux véhicules
       </Link>
@@ -117,7 +117,7 @@ function FicheVehicule() {
   );
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-6">
         <Link to="/dashboard/listes/vehicules" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Retour aux véhicules
@@ -138,7 +138,7 @@ function FicheVehicule() {
         {/* Informations générales */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <h3 className="text-lg font-semibold text-card-foreground mb-4">Informations générales</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div><p className="text-muted-foreground">Marque</p><p className="font-medium text-card-foreground">{vehicule.marque || "—"}</p></div>
             <div><p className="text-muted-foreground">Modèle</p><p className="font-medium text-card-foreground">{vehicule.modele || "—"}</p></div>
             <div><p className="text-muted-foreground">VIN</p><p className="font-medium font-mono text-xs text-card-foreground">{vehicule.vin || "—"}</p></div>

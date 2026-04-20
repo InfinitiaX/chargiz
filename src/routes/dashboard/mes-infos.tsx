@@ -99,7 +99,7 @@ function MesInfosPage() {
         {/* Informations personnelles */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <h3 className="flex items-center gap-2 text-lg font-semibold text-card-foreground mb-4"><User className="h-5 w-5 text-primary" /> Informations personnelles</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             {editMode ? (
               <>
                 <div><label className="text-muted-foreground text-xs">Nom</label><input value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} className={inputCls} /></div>
@@ -142,13 +142,13 @@ function MesInfosPage() {
 
         {/* Politique de recharge */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
             <h3 className="flex items-center gap-2 text-lg font-semibold text-card-foreground"><Shield className="h-5 w-5 text-primary" /> Politique de recharge</h3>
             <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${politiqueDeleguee ? "bg-chargiz-teal/10 text-chargiz-teal" : "bg-muted text-muted-foreground"}`}>
               {politiqueDeleguee ? "Délégué — modifiable" : "Géré par l'entreprise"}
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <label className="text-muted-foreground text-xs">Coût kWh domicile (€)</label>
               {editMode && politiqueDeleguee ? (
@@ -183,7 +183,7 @@ function MesInfosPage() {
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <h3 className="flex items-center gap-2 text-lg font-semibold text-card-foreground mb-4"><Car className="h-5 w-5 text-primary" /> Véhicule</h3>
           {vehicule ? (
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><p className="text-muted-foreground">Marque</p><p className="font-medium text-card-foreground">{(vehicule.marque as string) || "—"}</p></div>
               <div><p className="text-muted-foreground">Modèle</p><p className="font-medium text-card-foreground">{(vehicule.modele as string) || "—"}</p></div>
               <div><p className="text-muted-foreground">Immatriculation</p><p className="font-medium font-mono text-card-foreground">{(vehicule.immatriculation as string) || "—"}</p></div>

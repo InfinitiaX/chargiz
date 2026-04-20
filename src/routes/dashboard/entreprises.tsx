@@ -69,10 +69,10 @@ function EntreprisesPage() {
   );
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Entreprises</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Entreprises</h1>
           <p className="mt-1 text-sm text-muted-foreground">Gestion des entreprises clientes</p>
         </div>
         {isAtLeast("admin") && (
@@ -102,7 +102,7 @@ function EntreprisesPage() {
             return (
               <div key={e.id} className="rounded-xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
                       <Building2 className="h-5 w-5 text-primary" />
                     </div>

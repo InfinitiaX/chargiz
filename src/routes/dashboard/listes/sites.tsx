@@ -97,13 +97,13 @@ function ListeSites() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Sites</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Sites</h1>
           <p className="mt-1 text-sm text-muted-foreground">Liste des sites de l'entreprise</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button onClick={() => exportCSV("sites", filtered.map(s => ({
             Nom: s.nom, Filiale: filiales[s.filiale_id] || "",
             Adresse: s.adresse || "", "Code postal": s.code_postal || "", Ville: s.ville || "",
@@ -146,7 +146,7 @@ function ListeSites() {
               ) : filtered.map(s => (
                 <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                         <MapPin className="h-4 w-4 text-primary" />
                       </div>
@@ -180,11 +180,11 @@ function ListeSites() {
       {viewSite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
               <h2 className="text-lg font-semibold text-card-foreground">{viewSite.nom}</h2>
               <button onClick={() => setViewSite(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><p className="text-muted-foreground text-xs">Filiale</p><p className="mt-1 text-card-foreground">{filiales[viewSite.filiale_id] || "—"}</p></div>
               <div><p className="text-muted-foreground text-xs">Adresse</p><p className="mt-1 text-card-foreground">{[viewSite.adresse, viewSite.code_postal, viewSite.ville].filter(Boolean).join(", ") || "—"}</p></div>
               <div><p className="text-muted-foreground text-xs">SIRET</p><p className="mt-1 font-mono text-card-foreground">{viewSite.siret || "—"}</p></div>
@@ -201,25 +201,25 @@ function ListeSites() {
       {editSite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
               <h2 className="text-lg font-semibold text-card-foreground">Modifier le site</h2>
               <button onClick={() => setEditSite(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
               <div><label className="text-sm font-medium text-foreground">Nom</label><input className={inputCls} value={editSite.nom} onChange={e => setEditSite({ ...editSite, nom: e.target.value })} /></div>
               <div><label className="text-sm font-medium text-foreground">Adresse</label><input className={inputCls} value={editSite.adresse || ""} onChange={e => setEditSite({ ...editSite, adresse: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-sm font-medium text-foreground">Code postal</label><input className={inputCls} value={editSite.code_postal || ""} onChange={e => setEditSite({ ...editSite, code_postal: e.target.value })} /></div>
                 <div><label className="text-sm font-medium text-foreground">Ville</label><input className={inputCls} value={editSite.ville || ""} onChange={e => setEditSite({ ...editSite, ville: e.target.value })} /></div>
               </div>
               <div><label className="text-sm font-medium text-foreground">SIRET</label><input className={inputCls} value={editSite.siret || ""} onChange={e => setEditSite({ ...editSite, siret: e.target.value })} /></div>
               <div className="border-t border-border pt-4">
                 <p className="text-sm font-medium text-foreground mb-3">Responsable</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className="text-sm text-muted-foreground">Nom</label><input className={inputCls} value={editSite.responsable_nom || ""} onChange={e => setEditSite({ ...editSite, responsable_nom: e.target.value })} /></div>
                   <div><label className="text-sm text-muted-foreground">Prénom</label><input className={inputCls} value={editSite.responsable_prenom || ""} onChange={e => setEditSite({ ...editSite, responsable_prenom: e.target.value })} /></div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                   <div><label className="text-sm text-muted-foreground">Email</label><input className={inputCls} value={editSite.responsable_email || ""} onChange={e => setEditSite({ ...editSite, responsable_email: e.target.value })} /></div>
                   <div><label className="text-sm text-muted-foreground">Téléphone</label><input className={inputCls} value={editSite.responsable_telephone || ""} onChange={e => setEditSite({ ...editSite, responsable_telephone: e.target.value })} /></div>
                 </div>
