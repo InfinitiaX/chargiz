@@ -33,7 +33,7 @@ function DashboardLayout() {
   return (
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
-      <main className="pl-64">
+      <main className="pt-14 md:pt-0 md:pl-64">
         <Outlet />
       </main>
     </div>
