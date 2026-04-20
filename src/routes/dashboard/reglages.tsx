@@ -97,9 +97,9 @@ function ReglagesPage() {
   const isGestSite = role === "gestionnaire_site";
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Réglages</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Réglages</h1>
         <p className="mt-1 text-sm text-muted-foreground">Paramètres de l'entreprise et politique de recharge</p>
       </div>
 

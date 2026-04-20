@@ -97,13 +97,13 @@ function ListeSites() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Sites</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Sites</h1>
           <p className="mt-1 text-sm text-muted-foreground">Liste des sites de l'entreprise</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button onClick={() => exportCSV("sites", filtered.map(s => ({
             Nom: s.nom, Filiale: filiales[s.filiale_id] || "",
             Adresse: s.adresse || "", "Code postal": s.code_postal || "", Ville: s.ville || "",
@@ -146,7 +146,7 @@ function ListeSites() {
               ) : filtered.map(s => (
                 <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                         <MapPin className="h-4 w-4 text-primary" />
                       </div>

@@ -60,10 +60,10 @@ function MesConsommationsPage() {
   }, [profile, dateFrom, dateTo, vehicule]);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Mes consommations</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Mes consommations</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Historique de vos sessions de recharge {vehicule && `— ${vehicule.marque} ${vehicule.modele}`}
           </p>

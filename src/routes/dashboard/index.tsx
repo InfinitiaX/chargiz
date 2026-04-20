@@ -73,9 +73,9 @@ function SuperAdminDashboard() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Plateforme ChargiZ</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Plateforme ChargiZ</h1>
         <p className="mt-1 text-sm text-muted-foreground">Vue globale multi-entreprises — SuperAdmin</p>
       </div>
 
@@ -173,9 +173,9 @@ function AdminDashboard() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Supervision</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Supervision</h1>
         <p className="mt-1 text-sm text-muted-foreground">Tableau comparatif — filiales, sites, conducteurs, énergie par entreprise</p>
       </div>
 
@@ -252,9 +252,9 @@ function GestEntrepriseDashboard() {
   const filtered = collabs.filter(c => !search || `${c.nom} ${c.prenom}`.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Mon entreprise</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Mon entreprise</h1>
         <p className="mt-1 text-sm text-muted-foreground">Filiales, sites, collaborateurs, CO₂ évité, remboursements</p>
       </div>
 
@@ -334,9 +334,9 @@ function GestFilialeDashboard() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Ma filiale</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Ma filiale</h1>
         <p className="mt-1 text-sm text-muted-foreground">Sites, collaborateurs par site, sessions récentes</p>
       </div>
 
@@ -428,9 +428,9 @@ function GestSiteDashboard() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Mon site</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Mon site</h1>
         <p className="mt-1 text-sm text-muted-foreground">Conducteurs, sessions SOC début/fin, résumé financier</p>
       </div>
 
@@ -527,9 +527,9 @@ function ConducteurDashboard() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Ma performance</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Ma performance</h1>
         <p className="mt-1 text-sm text-muted-foreground">Votre activité de recharge individuelle</p>
       </div>
 
