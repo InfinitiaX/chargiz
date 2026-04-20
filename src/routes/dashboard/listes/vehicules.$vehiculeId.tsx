@@ -138,7 +138,7 @@ function FicheVehicule() {
         {/* Informations générales */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <h3 className="text-lg font-semibold text-card-foreground mb-4">Informations générales</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div><p className="text-muted-foreground">Marque</p><p className="font-medium text-card-foreground">{vehicule.marque || "—"}</p></div>
             <div><p className="text-muted-foreground">Modèle</p><p className="font-medium text-card-foreground">{vehicule.modele || "—"}</p></div>
             <div><p className="text-muted-foreground">VIN</p><p className="font-medium font-mono text-xs text-card-foreground">{vehicule.vin || "—"}</p></div>
