@@ -1,125 +1,124 @@
-// Migration shim — kept so existing screens still compile while we move
-// every page to the new src/api/ layer. No network call to Supabase is
-// performed; everything resolves to empty data of the correct shape so
-// the UI keeps rendering without runtime crashes.
+// Front-only mock client mimicking the subset of the Supabase JS API
+// used by ChargiZ screens. Returns realistic data from src/lib/mockData.ts
+// so the demo maquette stays interactive without any backend.
+import { tableMap } from "./mockData";
 
-type SupabaseListResult<TRow> = {
-  data: TRow[];
-  error: Error | null;
-  count: number | null;
-};
+type AnyRow = Record<string, any>;
 
-type SupabaseSingleResult<TRow> = {
-  data: TRow | null;
-  error: Error | null;
-  count: number | null;
-};
+interface CountOptions { count?: "exact" | "planned" | "estimated" }
 
-type SupabaseMutationResult<TRow> = {
-  data: TRow | null;
-  error: Error | null;
-  count: number | null;
-};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+class QueryBuilder<TRow = any> implements PromiseLike<{ data: TRow[]; error: null; count: number | null }> {
+  private rows: AnyRow[];
+  private wantCount = false;
+  private orderBy: { col: string; asc: boolean } | null = null;
+  private rangeLimit: number | null = null;
 
-const MIGRATION_MESSAGE =
-  "Supabase est désactivé pendant la migration vers le backend ChargiZ.";
-
-class SupabaseQueryBuilder<TRow> implements PromiseLike<SupabaseListResult<TRow>> {
-  // Mode is tracked for clarity but the promise interface always returns the
-  // list shape — single/maybeSingle return their own promise above.
-
-  // --- selection / mutation ---
-  select<TPicked = TRow>(..._args: unknown[]): SupabaseQueryBuilder<TPicked> {
-    return this as unknown as SupabaseQueryBuilder<TPicked>;
+  constructor(private table: string) {
+    this.rows = [...(tableMap[table] || [])];
   }
 
-  insert(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
+  select<TPicked = TRow>(_cols?: string, opts?: CountOptions): QueryBuilder<TPicked> {
+    if (opts?.count) this.wantCount = true;
+    return this as unknown as QueryBuilder<TPicked>;
+  }
+  insert(payload: AnyRow | AnyRow[]) {
+    const list = Array.isArray(payload) ? payload : [payload];
+    list.forEach((p, i) => {
+      const row = { id: `${this.table}-new-${Date.now()}-${i}`, created_at: new Date().toISOString(), ...p };
+      (tableMap[this.table] ||= []).push(row);
+      this.rows.push(row);
+    });
+    return this;
+  }
+  update(patch: AnyRow) {
+    this.rows = this.rows.map(r => ({ ...r, ...patch }));
+    return this;
+  }
+  delete() { this.rows = []; return this; }
+  upsert(payload: AnyRow | AnyRow[]) { return this.insert(payload); }
+
+  eq(col: string, val: unknown) { this.rows = this.rows.filter(r => r[col] === val); return this; }
+  neq(col: string, val: unknown) { this.rows = this.rows.filter(r => r[col] !== val); return this; }
+  in(col: string, vals: unknown[]) { this.rows = this.rows.filter(r => vals.includes(r[col])); return this; }
+  gt(col: string, val: any) { this.rows = this.rows.filter(r => r[col] > val); return this; }
+  gte(col: string, val: any) { this.rows = this.rows.filter(r => r[col] >= val); return this; }
+  lt(col: string, val: any) { this.rows = this.rows.filter(r => r[col] < val); return this; }
+  lte(col: string, val: any) { this.rows = this.rows.filter(r => r[col] <= val); return this; }
+  like() { return this; }
+  ilike(col: string, pattern: string) {
+    const re = new RegExp(pattern.replace(/%/g, ".*"), "i");
+    this.rows = this.rows.filter(r => re.test(String(r[col] ?? "")));
+    return this;
+  }
+  is(col: string, val: any) { this.rows = this.rows.filter(r => r[col] === val); return this; }
+  not(col: string, _op: string, val: any) { this.rows = this.rows.filter(r => r[col] !== val); return this; }
+  or() { return this; }
+  contains() { return this; }
+  match(filters: AnyRow) {
+    Object.entries(filters).forEach(([k, v]) => { this.rows = this.rows.filter(r => r[k] === v); });
     return this;
   }
 
-  update(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
+  order(col: string, opts?: { ascending?: boolean }) {
+    this.orderBy = { col, asc: opts?.ascending !== false };
     return this;
   }
+  limit(n: number) { this.rangeLimit = n; return this; }
+  range(from: number, to: number) { this.rows = this.rows.slice(from, to + 1); return this; }
 
-  delete(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
-    return this;
+  private build(): TRow[] {
+    let out = [...this.rows];
+    if (this.orderBy) {
+      const { col, asc } = this.orderBy;
+      out.sort((a, b) => {
+        const av = a[col], bv = b[col];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (av < bv) return asc ? -1 : 1;
+        if (av > bv) return asc ? 1 : -1;
+        return 0;
+      });
+    }
+    if (this.rangeLimit != null) out = out.slice(0, this.rangeLimit);
+    return out as TRow[];
   }
 
-  upsert(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
-    return this;
+  maybeSingle() {
+    const data = this.build()[0] ?? null;
+    return Promise.resolve({ data, error: null, count: data ? 1 : 0 });
+  }
+  single() {
+    const data = this.build()[0] ?? null;
+    return Promise.resolve({ data, error: null, count: data ? 1 : 0 });
   }
 
-  // --- filters ---
-  eq(..._args: unknown[]) { return this; }
-  neq(..._args: unknown[]) { return this; }
-  in(..._args: unknown[]) { return this; }
-  gt(..._args: unknown[]) { return this; }
-  gte(..._args: unknown[]) { return this; }
-  lt(..._args: unknown[]) { return this; }
-  lte(..._args: unknown[]) { return this; }
-  like(..._args: unknown[]) { return this; }
-  ilike(..._args: unknown[]) { return this; }
-  is(..._args: unknown[]) { return this; }
-  not(..._args: unknown[]) { return this; }
-  or(..._args: unknown[]) { return this; }
-  contains(..._args: unknown[]) { return this; }
-  match(..._args: unknown[]) { return this; }
-
-  // --- ordering / paging ---
-  order(..._args: unknown[]) { return this; }
-  limit(..._args: unknown[]) { return this; }
-  range(..._args: unknown[]) { return this; }
-
-  // --- result-shaping ---
-  maybeSingle(): PromiseLike<SupabaseSingleResult<TRow>> {
-    return Promise.resolve({ data: null, error: null, count: 0 });
-  }
-
-  single(): PromiseLike<SupabaseSingleResult<TRow>> {
-    return Promise.resolve({ data: null, error: null, count: 0 });
-  }
-
-  // --- promise interface (default = list) ---
-  then<TResult1 = SupabaseListResult<TRow>, TResult2 = never>(
-    onfulfilled?:
-      | ((value: SupabaseListResult<TRow>) => TResult1 | PromiseLike<TResult1>)
-      | null,
+  then<TResult1 = { data: TRow[]; error: null; count: number | null }, TResult2 = never>(
+    onfulfilled?: ((value: { data: TRow[]; error: null; count: number | null }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): PromiseLike<TResult1 | TResult2> {
-    return Promise.resolve(this.buildResult()).then(onfulfilled, onrejected);
+    const data = this.build();
+    return Promise.resolve({ data, error: null, count: this.wantCount ? data.length : null }).then(onfulfilled, onrejected);
   }
-
-  catch<TResult = never>(
-    onrejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null,
-  ) {
-    return Promise.resolve(this.buildResult()).catch(onrejected);
+  catch(onrejected?: ((reason: unknown) => unknown) | null) {
+    return Promise.resolve(this.build()).catch(onrejected as any);
   }
-
   finally(onfinally?: (() => void) | null) {
-    return Promise.resolve(this.buildResult()).finally(onfinally ?? undefined);
+    return Promise.resolve(this.build()).finally(onfinally ?? undefined);
   }
-
-  private buildResult(): SupabaseListResult<TRow> {
-    return { data: [] as TRow[], error: null, count: 0 };
-  }
-}
-
-type AuthResponse<T> = { data: T | null; error: Error | null };
-
-async function migrationError<T>(): Promise<AuthResponse<T>> {
-  return { data: null, error: new Error(MIGRATION_MESSAGE) };
 }
 
 export const supabase = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  from<TRow = any>(_table: string): SupabaseQueryBuilder<TRow> {
-    return new SupabaseQueryBuilder<TRow>();
+  from<TRow = any>(table: string): QueryBuilder<TRow> {
+    return new QueryBuilder<TRow>(table);
   },
   auth: {
-    signInWithPassword: (..._args: unknown[]) => migrationError(),
-    resetPasswordForEmail: (..._args: unknown[]) => migrationError(),
-    updateUser: (..._args: unknown[]) => migrationError(),
-    getClaims: (..._args: unknown[]) => migrationError(),
+    signInWithPassword: async () => ({ data: { user: null, session: null }, error: null }),
+    resetPasswordForEmail: async () => ({ data: null, error: null }),
+    updateUser: async () => ({ data: { user: null }, error: null }),
+    getClaims: async () => ({ data: null, error: null }),
     signOut: async () => ({ error: null }),
     getSession: async () => ({ data: { session: null }, error: null }),
     getUser: async () => ({ data: { user: null }, error: null }),
