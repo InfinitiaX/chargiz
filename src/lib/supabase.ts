@@ -119,7 +119,8 @@ async function migrationError<T>(): Promise<AuthResponse<T>> {
 }
 
 export const supabase = {
-  from<TRow = Record<string, unknown>>(_table: string): SupabaseQueryBuilder<TRow> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from<TRow = Record<string, any>>(_table: string): SupabaseQueryBuilder<TRow> {
     return new SupabaseQueryBuilder<TRow>();
   },
   auth: {
