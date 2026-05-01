@@ -12,6 +12,18 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    sourcemap: false,
+    minify: "esbuild",
+    cssMinify: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "@tanstack/react-router"],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
