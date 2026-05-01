@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import logoChargiz from "@/assets/logo-chargiz.png";
-import loginHero from "@/assets/login-hero.png";
+import loginHero from "@/assets/login-hero.jpg";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
