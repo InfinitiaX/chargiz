@@ -7,7 +7,8 @@ type AnyRow = Record<string, any>;
 
 interface CountOptions { count?: "exact" | "planned" | "estimated" }
 
-class QueryBuilder<TRow extends AnyRow = AnyRow> implements PromiseLike<{ data: TRow[]; error: null; count: number | null }> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+class QueryBuilder<TRow = any> implements PromiseLike<{ data: TRow[]; error: null; count: number | null }> {
   private rows: AnyRow[];
   private wantCount = false;
   private orderBy: { col: string; asc: boolean } | null = null;
@@ -17,9 +18,9 @@ class QueryBuilder<TRow extends AnyRow = AnyRow> implements PromiseLike<{ data: 
     this.rows = [...(tableMap[table] || [])];
   }
 
-  select(_cols?: string, opts?: CountOptions) {
+  select<TPicked = TRow>(_cols?: string, opts?: CountOptions): QueryBuilder<TPicked> {
     if (opts?.count) this.wantCount = true;
-    return this;
+    return this as unknown as QueryBuilder<TPicked>;
   }
   insert(payload: AnyRow | AnyRow[]) {
     const list = Array.isArray(payload) ? payload : [payload];
@@ -109,7 +110,8 @@ class QueryBuilder<TRow extends AnyRow = AnyRow> implements PromiseLike<{ data: 
 }
 
 export const supabase = {
-  from<TRow extends AnyRow = AnyRow>(table: string): QueryBuilder<TRow> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from<TRow = any>(table: string): QueryBuilder<TRow> {
     return new QueryBuilder<TRow>(table);
   },
   auth: {

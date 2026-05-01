@@ -34,8 +34,7 @@ function ResetPasswordPage() {
     setLoading(true);
     setError("");
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
+      await supabase.auth.updateUser();
       setDone(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
