@@ -25,7 +25,8 @@ const MIGRATION_MESSAGE =
   "Supabase est désactivé pendant la migration vers le backend ChargiZ.";
 
 class SupabaseQueryBuilder<TRow> implements PromiseLike<SupabaseListResult<TRow>> {
-  protected mode: "list" | "single" | "mutation" = "list";
+  // Mode is tracked for clarity but the promise interface always returns the
+  // list shape — single/maybeSingle return their own promise above.
 
   // --- selection / mutation ---
   select<TPicked = TRow>(..._args: unknown[]): SupabaseQueryBuilder<TPicked> {
@@ -33,22 +34,18 @@ class SupabaseQueryBuilder<TRow> implements PromiseLike<SupabaseListResult<TRow>
   }
 
   insert(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
-    this.mode = "mutation";
     return this;
   }
 
   update(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
-    this.mode = "mutation";
     return this;
   }
 
   delete(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
-    this.mode = "mutation";
     return this;
   }
 
   upsert(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
-    this.mode = "mutation";
     return this;
   }
 
@@ -75,12 +72,10 @@ class SupabaseQueryBuilder<TRow> implements PromiseLike<SupabaseListResult<TRow>
 
   // --- result-shaping ---
   maybeSingle(): PromiseLike<SupabaseSingleResult<TRow>> {
-    this.mode = "single";
     return Promise.resolve({ data: null, error: null, count: 0 });
   }
 
   single(): PromiseLike<SupabaseSingleResult<TRow>> {
-    this.mode = "single";
     return Promise.resolve({ data: null, error: null, count: 0 });
   }
 
@@ -104,10 +99,7 @@ class SupabaseQueryBuilder<TRow> implements PromiseLike<SupabaseListResult<TRow>
     return Promise.resolve(this.buildResult()).finally(onfinally ?? undefined);
   }
 
-  private buildResult(): SupabaseListResult<TRow> | SupabaseMutationResult<TRow> {
-    if (this.mode === "mutation") {
-      return { data: null, error: null, count: 0 };
-    }
+  private buildResult(): SupabaseListResult<TRow> {
     return { data: [] as TRow[], error: null, count: 0 };
   }
 }
