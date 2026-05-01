@@ -3,7 +3,7 @@ import logoChargiz from "@/assets/logo-chargiz.png";
 import loginHero from "@/assets/login-hero.png";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/")({
   component: LoginPage,
@@ -24,14 +24,14 @@ function LoginPage() {
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
   const navigate = useNavigate();
+  const { signIn } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      await signIn(email, password);
       navigate({ to: "/dashboard" });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur de connexion");
@@ -42,19 +42,8 @@ function LoginPage() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) throw error;
-      setForgotSent(true);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erreur");
-    } finally {
-      setLoading(false);
-    }
+    setError("La réinitialisation du mot de passe n'est pas encore branchée sur le nouveau backend.");
+    setForgotSent(false);
   };
 
   return (
@@ -104,8 +93,8 @@ function LoginPage() {
           ) : forgotMode ? (
             <form className="space-y-5" onSubmit={handleForgotPassword}>
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-foreground">Adresse email</label>
-                <input id="email" type="email" required placeholder="nom@entreprise.fr" value={email} onChange={e => setEmail(e.target.value)}
+                <label htmlFor="email" className="text-sm font-medium text-foreground">Email ou nom d'utilisateur</label>
+                <input id="email" type="text" required placeholder="superadmin ou nom@entreprise.fr" value={email} onChange={e => setEmail(e.target.value)}
                   className="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20" />
               </div>
               <button type="submit" disabled={loading} className="w-full rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground transition-all hover:brightness-95 active:scale-[0.98] disabled:opacity-50">
@@ -116,8 +105,8 @@ function LoginPage() {
           ) : (
             <form className="space-y-5" onSubmit={handleLogin}>
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-foreground">Adresse email</label>
-                <input id="email" type="email" required placeholder="nom@entreprise.fr" value={email} onChange={e => setEmail(e.target.value)}
+                <label htmlFor="email" className="text-sm font-medium text-foreground">Email ou nom d'utilisateur</label>
+                <input id="email" type="text" required placeholder="superadmin ou nom@entreprise.fr" value={email} onChange={e => setEmail(e.target.value)}
                   className="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20" />
               </div>
               <div className="space-y-2">

@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useAuth, type AppRole } from "@/hooks/useAuth";
+import CreateUserDialog from "@/components/CreateUserDialog";
 import {
   ShieldCheck, Building2, MapPin, Users, Car, Database, Download,
   Euro, BarChart3, Settings, Plug, KeyRound, Link2, FileText,
@@ -297,7 +299,8 @@ const ROLE_LABELS: Record<AppRole, string> = {
 };
 
 function AdministrationPage() {
-  const { role, loading } = useAuth();
+  const { role, profile, loading } = useAuth();
+  const [showCreateUser, setShowCreateUser] = useState(false);
 
   if (loading) {
     return (
@@ -312,10 +315,12 @@ function AdministrationPage() {
   }
 
   const groups = getGroupsForRole(role);
+  const canCreateAccounts = role !== "collaborateur";
 
   return (
     <div className="p-4 sm:p-6 md:p-8">
-      <div className="mb-8">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-primary" />
           Administration — {ROLE_LABELS[role]}
@@ -323,6 +328,12 @@ function AdministrationPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Actions disponibles selon votre rôle et votre périmètre organisationnel
         </p>
+        </div>
+        {canCreateAccounts && (
+          <button onClick={() => setShowCreateUser(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
+            <Plus className="h-4 w-4" /> Creer un compte
+          </button>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -359,6 +370,15 @@ function AdministrationPage() {
           </div>
         ))}
       </div>
+      {canCreateAccounts && (
+        <CreateUserDialog
+          actorRole={role}
+          profile={profile}
+          open={showCreateUser}
+          onClose={() => setShowCreateUser(false)}
+          onCreated={() => setShowCreateUser(false)}
+        />
+      )}
     </div>
   );
 }

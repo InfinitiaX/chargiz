@@ -54,17 +54,9 @@ export default function DashboardSidebar() {
   const getListesItems = (): NavItem[] => {
     const items: NavItem[] = [];
     if (role === "superadmin") {
-      items.push({ to: "/dashboard/listes/admins", icon: ShieldCheck, label: "Admins" });
-    }
-    if (role === "superadmin" || role === "admin") {
       items.push({ to: "/dashboard/listes/entreprises", icon: Building2, label: "Entreprises" });
     }
-    if (role === "superadmin" || role === "admin" || role === "gestionnaire_entreprise") {
-      items.push({ to: "/dashboard/listes/filiales", icon: Building2, label: "Filiales" });
-    }
-    if (role === "superadmin" || role === "admin" || role === "gestionnaire_entreprise" || role === "gestionnaire_filiale") {
-      items.push({ to: "/dashboard/listes/sites", icon: MapPin, label: "Sites" });
-    }
+    // Every manager/admin sees these within their scope
     items.push({ to: "/dashboard/listes/vehicules", icon: Car, label: "Véhicules" });
     items.push({ to: "/dashboard/listes/collaborateurs", icon: Users, label: "Collaborateurs" });
     return items;
@@ -175,7 +167,7 @@ export default function DashboardSidebar() {
             </div>
           )}
 
-          {role && (
+          {(role === "superadmin" || role === "gestionnaire_entreprise") && (
             <Link to="/dashboard/administration"
               className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition-all ${
                 location.pathname.startsWith("/dashboard/administration") ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"

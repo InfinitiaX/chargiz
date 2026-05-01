@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import CreateCollaborateurDialog from "@/components/CreateCollaborateurDialog";
-import { Plus, Search, Filter } from "lucide-react";
+import { Plus, Search, Filter, Download, Upload } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/collaborateurs")({
   component: CollaborateursPage,
@@ -37,20 +37,54 @@ function CollaborateursPage() {
   }, [entrepriseId]);
 
   async function loadCollabs() {
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, user_id, nom, prenom, email, site_id, is_active")
-      .eq("entreprise_id", entrepriseId)
-      .order("nom");
-    if (!profiles) return;
-    const userIds = profiles.map(p => p.user_id).filter(Boolean) as string[];
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("user_id, role")
-      .in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
-    const nonCollab = new Set((roles || []).filter(r => r.role !== "collaborateur").map(r => r.user_id));
-    setCollaborateurs(profiles.filter(p => !p.user_id || !nonCollab.has(p.user_id)));
+    try {
+      const data = await apiFetch<Collab[]>("/api/collaborateurs", {
+        params: { entreprise_id: entrepriseId }
+      } as any);
+      setCollaborateurs(data);
+    } catch (err) {
+      console.error("Error loading collabs:", err);
+    }
   }
+
+  const handleExport = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/collaborateurs/export/csv?entreprise_id=${entrepriseId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("chargiz_access_token")}`
+        }
+      });
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `collaborateurs_${entrepriseId}.csv`;
+      a.click();
+    } catch (err) {
+      console.error("Export error:", err);
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      try {
+        await apiFetch("/api/collaborateurs/import/csv", {
+          method: "POST",
+          body: JSON.stringify({ file_content: content }),
+        });
+        alert("Import réussi");
+        loadCollabs();
+      } catch (err) {
+        console.error("Import error:", err);
+        alert("Erreur lors de l'import");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const filtered = collaborateurs.filter(c =>
     !search || `${c.nom} ${c.prenom} ${c.email}`.toLowerCase().includes(search.toLowerCase())
@@ -63,9 +97,18 @@ function CollaborateursPage() {
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Collaborateurs</h1>
           <p className="mt-1 text-sm text-muted-foreground">Gérez vos collaborateurs et suivez leurs recharges</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-chargiz-teal-light">
-          <Plus className="h-4 w-4" /> Ajouter un collaborateur
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors">
+            <Upload className="h-4 w-4" /> Import CSV
+            <input type="file" accept=".csv" className="hidden" onChange={handleImport} />
+          </label>
+          <button onClick={handleExport} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors">
+            <Download className="h-4 w-4" /> Export CSV
+          </button>
+          <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-chargiz-teal-light">
+            <Plus className="h-4 w-4" /> Ajouter un collaborateur
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 flex items-center gap-3">

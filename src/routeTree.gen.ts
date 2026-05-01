@@ -23,6 +23,7 @@ import { Route as CollaborateursRouteImport } from './routes/collaborateurs'
 import { Route as AdminsRouteImport } from './routes/admins'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as OnboardingTokenRouteImport } from './routes/onboarding.$token'
 import { Route as DashboardVehiculesRouteImport } from './routes/dashboard/vehicules'
 import { Route as DashboardStatistiquesRouteImport } from './routes/dashboard/statistiques'
 import { Route as DashboardReglagesRouteImport } from './routes/dashboard/reglages'
@@ -110,6 +111,11 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => DashboardRoute,
+} as any)
+const OnboardingTokenRoute = OnboardingTokenRouteImport.update({
+  id: '/onboarding/$token',
+  path: '/onboarding/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardVehiculesRoute = DashboardVehiculesRouteImport.update({
   id: '/vehicules',
@@ -226,6 +232,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/reglages': typeof DashboardReglagesRoute
   '/dashboard/statistiques': typeof DashboardStatistiquesRoute
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
+  '/onboarding/$token': typeof OnboardingTokenRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/collaborateur/$id': typeof DashboardCollaborateurIdRoute
   '/dashboard/listes/admins': typeof DashboardListesAdminsRoute
@@ -258,6 +265,7 @@ export interface FileRoutesByTo {
   '/dashboard/reglages': typeof DashboardReglagesRoute
   '/dashboard/statistiques': typeof DashboardStatistiquesRoute
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
+  '/onboarding/$token': typeof OnboardingTokenRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/collaborateur/$id': typeof DashboardCollaborateurIdRoute
   '/dashboard/listes/admins': typeof DashboardListesAdminsRoute
@@ -292,6 +300,7 @@ export interface FileRoutesById {
   '/dashboard/reglages': typeof DashboardReglagesRoute
   '/dashboard/statistiques': typeof DashboardStatistiquesRoute
   '/dashboard/vehicules': typeof DashboardVehiculesRoute
+  '/onboarding/$token': typeof OnboardingTokenRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/collaborateur/$id': typeof DashboardCollaborateurIdRoute
   '/dashboard/listes/admins': typeof DashboardListesAdminsRoute
@@ -327,6 +336,7 @@ export interface FileRouteTypes {
     | '/dashboard/reglages'
     | '/dashboard/statistiques'
     | '/dashboard/vehicules'
+    | '/onboarding/$token'
     | '/dashboard/'
     | '/dashboard/collaborateur/$id'
     | '/dashboard/listes/admins'
@@ -359,6 +369,7 @@ export interface FileRouteTypes {
     | '/dashboard/reglages'
     | '/dashboard/statistiques'
     | '/dashboard/vehicules'
+    | '/onboarding/$token'
     | '/dashboard'
     | '/dashboard/collaborateur/$id'
     | '/dashboard/listes/admins'
@@ -392,6 +403,7 @@ export interface FileRouteTypes {
     | '/dashboard/reglages'
     | '/dashboard/statistiques'
     | '/dashboard/vehicules'
+    | '/onboarding/$token'
     | '/dashboard/'
     | '/dashboard/collaborateur/$id'
     | '/dashboard/listes/admins'
@@ -417,6 +429,7 @@ export interface RootRouteChildren {
   SitesRoute: typeof SitesRoute
   StatistiquesRoute: typeof StatistiquesRoute
   VehiculesRoute: typeof VehiculesRoute
+  OnboardingTokenRoute: typeof OnboardingTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -518,6 +531,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/'
       preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/onboarding/$token': {
+      id: '/onboarding/$token'
+      path: '/onboarding/$token'
+      fullPath: '/onboarding/$token'
+      preLoaderRoute: typeof OnboardingTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/dashboard/vehicules': {
       id: '/dashboard/vehicules'
@@ -724,6 +744,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitesRoute: SitesRoute,
   StatistiquesRoute: StatistiquesRoute,
   VehiculesRoute: VehiculesRoute,
+  OnboardingTokenRoute: OnboardingTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

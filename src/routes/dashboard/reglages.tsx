@@ -10,14 +10,13 @@ export const Route = createFileRoute("/dashboard/reglages")({
 });
 
 function ReglagesPage() {
-  const { profile, role, user } = useAuth();
-  const [entreprise, setEntreprise] = useState<Record<string, string | number | null>>({});
-  const [filiale, setFiliale] = useState<Record<string, string | null>>({});
-  const [site, setSite] = useState<Record<string, string | null>>({});
-  const [politique, setPolitique] = useState<Record<string, unknown>>({});
+  const [entreprise, setEntreprise] = useState<any>({});
+  const [filiale, setFiliale] = useState<any>({});
+  const [site, setSite] = useState<any>({});
+  const [politique, setPolitique] = useState<any>(null);
+  
   const [saving, setSaving] = useState(false);
-
-  // Politique fields
+  
   const [prixKwh, setPrixKwh] = useState("0.21");
   const [joursAutorises, setJoursAutorises] = useState<string[]>(["lun", "mar", "mer", "jeu", "ven"]);
   const [heureDebut, setHeureDebut] = useState("00:00");
@@ -25,6 +24,14 @@ function ReglagesPage() {
   const [congesNonRembourses, setCongesNonRembourses] = useState(true);
   const [fermetures, setFermetures] = useState<string[]>([]);
   const [newFermeture, setNewFermeture] = useState("");
+  
+  // Password change
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passError, setPassError] = useState("");
+  const [passSuccess, setPassSuccess] = useState("");
+  const { profile, role, user, updatePassword } = useAuth();
 
   // Delegation level
   const [delegationPrix, setDelegationPrix] = useState("entreprise");
@@ -85,6 +92,25 @@ function ReglagesPage() {
     if (newFermeture && !fermetures.includes(newFermeture)) {
       setFermetures([...fermetures, newFermeture]);
       setNewFermeture("");
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassError("");
+    setPassSuccess("");
+    if (newPassword !== confirmPassword) {
+      setPassError("Les nouveaux mots de passe ne correspondent pas.");
+      return;
+    }
+    try {
+      await updatePassword(oldPassword, newPassword);
+      setPassSuccess("Mot de passe mis à jour avec succès.");
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setPassError(err.message || "Erreur lors du changement de mot de passe");
     }
   };
 
@@ -160,11 +186,38 @@ function ReglagesPage() {
             <User className="h-5 w-5 text-primary" />
             <h3 className="text-lg font-semibold text-card-foreground">Mon compte</h3>
           </div>
-          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            <div><label className="text-muted-foreground text-xs">Nom</label><p className="mt-1 text-card-foreground">{profile?.nom} {profile?.prenom}</p></div>
-            <div><label className="text-muted-foreground text-xs">Email</label><p className="mt-1 text-card-foreground">{profile?.email || user?.email}</p></div>
-            <div><label className="text-muted-foreground text-xs">Rôle</label><p className="mt-1 capitalize text-card-foreground">{role?.replace(/_/g, " ") || "—"}</p></div>
-            <div><label className="text-muted-foreground text-xs">Téléphone</label><p className="mt-1 text-card-foreground">{profile?.telephone || "—"}</p></div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-8">
+              <div><label className="text-muted-foreground text-xs">Nom</label><p className="mt-1 text-card-foreground">{profile?.nom} {profile?.prenom}</p></div>
+              <div><label className="text-muted-foreground text-xs">Email</label><p className="mt-1 text-card-foreground">{profile?.email || user?.email}</p></div>
+              <div><label className="text-muted-foreground text-xs">Rôle</label><p className="mt-1 capitalize text-card-foreground">{role?.replace(/_/g, " ") || "—"}</p></div>
+              <div><label className="text-muted-foreground text-xs">Téléphone</label><p className="mt-1 text-card-foreground">{profile?.telephone || "—"}</p></div>
+            </div>
+
+            <div className="pt-6 border-t border-border">
+              <h4 className="text-sm font-semibold text-card-foreground mb-4">Changer le mot de passe</h4>
+              {passError && <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">{passError}</div>}
+              {passSuccess && <div className="mb-4 rounded-lg bg-chargiz-teal/10 p-3 text-xs text-chargiz-teal">{passSuccess}</div>}
+              <form onSubmit={handlePasswordChange} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Ancien mot de passe</label>
+                    <input type="password" required value={oldPassword} onChange={e => setOldPassword(e.target.value)} className={inputCls} placeholder="••••••••" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Nouveau mot de passe</label>
+                    <input type="password" required value={newPassword} onChange={e => setNewPassword(e.target.value)} className={inputCls} placeholder="••••••••" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Confirmer</label>
+                    <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={inputCls} placeholder="••••••••" />
+                  </div>
+                </div>
+                <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:brightness-95">
+                  Mettre à jour le mot de passe
+                </button>
+              </form>
+            </div>
           </div>
         </div>
 

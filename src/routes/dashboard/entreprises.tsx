@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import CreateEntrepriseDialog from "@/components/CreateEntrepriseDialog";
 import { Plus, Search, Building2, Users, Car, Archive, Eye, X } from "lucide-react";
@@ -30,7 +30,8 @@ interface Entreprise {
 }
 
 function EntreprisesPage() {
-  const { isAtLeast } = useAuth();
+  const { role } = useAuth();
+  const isSuperAdmin = role === "superadmin";
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [search, setSearch] = useState("");
   const [entStats, setEntStats] = useState<Record<string, { filiales: number; collabs: number; vehicules: number }>>({});
@@ -42,26 +43,38 @@ function EntreprisesPage() {
   }, []);
 
   async function loadEntreprises() {
-    const { data } = await supabase.from("entreprises").select("*").order("nom");
-    if (data) {
-      setEntreprises(data as Entreprise[]);
+    try {
+      const data = await apiFetch<Entreprise[]>("/api/entreprises");
+      setEntreprises(data);
       const statsMap: Record<string, { filiales: number; collabs: number; vehicules: number }> = {};
       for (const ent of data) {
-        const [fil, coll, veh] = await Promise.all([
-          supabase.from("filiales").select("id", { count: "exact" }).eq("entreprise_id", ent.id),
-          supabase.from("profiles").select("id", { count: "exact" }).eq("entreprise_id", ent.id),
-          supabase.from("vehicules").select("id", { count: "exact" }).eq("entreprise_id", ent.id),
-        ]);
-        statsMap[ent.id] = { filiales: fil.count || 0, collabs: coll.count || 0, vehicules: veh.count || 0 };
+        try {
+          const stats = await apiFetch<any>(`/api/statistiques/entreprises/${ent.id}`);
+          statsMap[ent.id] = {
+            filiales: stats.nb_filiales,
+            collabs: stats.nb_collaborateurs,
+            vehicules: stats.nb_vehicules,
+          };
+        } catch (e) {
+          console.error(`Error loading stats for ${ent.id}:`, e);
+          statsMap[ent.id] = { filiales: 0, collabs: 0, vehicules: 0 };
+        }
       }
       setEntStats(statsMap);
+    } catch (err) {
+      console.error("Error loading entreprises:", err);
     }
   }
 
   const handleArchive = async (id: string) => {
     if (!confirm("Voulez-vous archiver cette entreprise ? Cette action est irréversible.")) return;
-    await supabase.from("entreprises").delete().eq("id", id);
-    loadEntreprises();
+    try {
+      await apiFetch(`/api/entreprises/${id}`, { method: "DELETE" });
+      loadEntreprises();
+    } catch (err) {
+      console.error("Error deleting entreprise:", err);
+      alert("Erreur lors de la suppression de l'entreprise");
+    }
   };
 
   const filtered = entreprises.filter(e =>
@@ -75,7 +88,7 @@ function EntreprisesPage() {
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Entreprises</h1>
           <p className="mt-1 text-sm text-muted-foreground">Gestion des entreprises clientes</p>
         </div>
-        {isAtLeast("admin") && (
+        {isSuperAdmin && (
           <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-chargiz-teal-light">
             <Plus className="h-4 w-4" /> Créer une entreprise
           </button>
@@ -113,7 +126,7 @@ function EntreprisesPage() {
                   </div>
                   <div className="flex gap-1">
                     <button onClick={() => setViewEnt(e)} title="Voir" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><Eye className="h-4 w-4" /></button>
-                    {isAtLeast("admin") && (
+                    {isSuperAdmin && (
                       <button onClick={() => handleArchive(e.id)} title="Archiver" className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Archive className="h-4 w-4" /></button>
                     )}
                   </div>

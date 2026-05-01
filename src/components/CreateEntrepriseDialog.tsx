@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 
 interface Props {
   open: boolean;
@@ -22,6 +22,8 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
     email: "",
     telephone: "",
     prix_kwh_defaut: "0.21",
+    manager_email: "",
+    manager_full_name: "",
   });
 
   if (!open) return null;
@@ -30,25 +32,43 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.from("entreprises").insert({
-        nom: form.nom,
-        siren: form.siren || null,
-        siret: form.siret || null,
-        numero_tva: form.numero_tva || null,
-        adresse: form.adresse || null,
-        code_postal: form.code_postal || null,
-        ville: form.ville || null,
-        pays: form.pays,
-        email: form.email || null,
-        telephone: form.telephone || null,
-        prix_kwh_defaut: parseFloat(form.prix_kwh_defaut) || 0.21,
+      await apiFetch("/api/entreprises", {
+        method: "POST",
+        body: JSON.stringify({
+          nom: form.nom,
+          siren: form.siren || null,
+          siret: form.siret || null,
+          numero_tva: form.numero_tva || null,
+          adresse: form.adresse || null,
+          code_postal: form.code_postal || null,
+          ville: form.ville || null,
+          email: form.email || null,
+          telephone: form.telephone || null,
+          prix_kwh_defaut: parseFloat(form.prix_kwh_defaut) || 0.21,
+          manager_email: form.manager_email,
+          manager_full_name: form.manager_full_name,
+        }),
       });
-      if (error) throw error;
       onCreated();
       onClose();
-      setForm({ nom: "", siren: "", siret: "", numero_tva: "", adresse: "", code_postal: "", ville: "", pays: "France", email: "", telephone: "", prix_kwh_defaut: "0.21" });
+      setForm({
+        nom: "",
+        siren: "",
+        siret: "",
+        numero_tva: "",
+        adresse: "",
+        code_postal: "",
+        ville: "",
+        pays: "France",
+        email: "",
+        telephone: "",
+        prix_kwh_defaut: "0.21",
+        manager_email: "",
+        manager_full_name: "",
+      });
     } catch (err) {
       console.error("Erreur création entreprise:", err);
+      alert("Erreur lors de la création de l'entreprise");
     } finally {
       setLoading(false);
     }
@@ -113,6 +133,20 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
           <div>
             <label className="text-sm font-medium text-foreground">Prix kWh par défaut (€)</label>
             <input type="number" step="0.0001" className={`${inputCls} max-w-xs`} value={form.prix_kwh_defaut} onChange={e => setForm(f => ({ ...f, prix_kwh_defaut: e.target.value }))} />
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <h3 className="text-sm font-bold text-card-foreground mb-4">Compte Gestionnaire Entreprise</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground">Nom complet du gestionnaire *</label>
+                <input required className={inputCls} value={form.manager_full_name} onChange={e => setForm(f => ({ ...f, manager_full_name: e.target.value }))} placeholder="Prénom Nom" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">Email du gestionnaire *</label>
+                <input required type="email" className={inputCls} value={form.manager_email} onChange={e => setForm(f => ({ ...f, manager_email: e.target.value }))} placeholder="nom@entreprise.fr" />
+              </div>
+            </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">Annuler</button>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 
 interface Props {
   entrepriseId: string;
@@ -23,9 +23,9 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
 
   useEffect(() => {
     if (open) {
-      supabase.from("profiles").select("id, nom, prenom").eq("entreprise_id", entrepriseId).eq("is_active", true).order("nom").then(({ data }) => {
-        if (data) setCollabs(data);
-      });
+      apiFetch<{ id: string; nom: string; prenom: string }[]>(`/api/collaborateurs?entreprise_id=${entrepriseId}&active_only=true`)
+        .then(setCollabs)
+        .catch(console.error);
     }
   }, [open, entrepriseId]);
 
@@ -35,17 +35,19 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.from("vehicules").insert({
-        entreprise_id: entrepriseId,
-        marque: form.marque || null,
-        modele: form.modele || null,
-        immatriculation: form.immatriculation || null,
-        vin: form.vin || null,
-        capacite_batterie: form.capacite_batterie ? parseFloat(form.capacite_batterie) : null,
-        collaborateur_id: form.collaborateur_id || null,
-        statut_affectation: form.collaborateur_id ? "affecte" : "non_affecte",
+      await apiFetch("/api/vehicules", {
+        method: "POST",
+        body: JSON.stringify({
+          entreprise_id: entrepriseId,
+          marque: form.marque || null,
+          modele: form.modele || null,
+          immatriculation: form.immatriculation || null,
+          vin: form.vin || null,
+          capacite_batterie: form.capacite_batterie ? parseFloat(form.capacite_batterie) : null,
+          collaborateur_id: form.collaborateur_id || null,
+          statut_affectation: form.collaborateur_id ? "affecte" : "non_affecte",
+        }),
       });
-      if (error) throw error;
       onCreated();
       onClose();
       setForm({ marque: "", modele: "", immatriculation: "", vin: "", capacite_batterie: "", collaborateur_id: "" });

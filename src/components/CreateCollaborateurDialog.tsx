@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 
 interface Props {
   entrepriseId: string;
@@ -31,21 +31,16 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
 
   useEffect(() => {
     if (open) {
-      supabase.from("filiales").select("id, nom").eq("entreprise_id", entrepriseId).then(({ data }) => {
-        if (data) setFiliales(data);
-      });
-      supabase.from("vehicules").select("id, marque, modele, immatriculation, statut_smartcar")
-        .eq("entreprise_id", entrepriseId)
-        .eq("statut_affectation", "non_affecte")
-        .then(({ data }) => { if (data) setVehiculesLibres(data.map(v => ({ id: v.id, marque: v.marque ?? '', modele: v.modele ?? '', immatriculation: v.immatriculation ?? '', statut_smartcar: v.statut_smartcar ?? '' }))); });
+      apiFetch<{ id: string; nom: string }[]>(`/api/entreprises/${entrepriseId}/filiales`).then(setFiliales).catch(console.error);
+      apiFetch<{ id: string; marque: string | null; modele: string | null; immatriculation: string | null; statut_smartcar: string | null }[]>(`/api/vehicules?entreprise_id=${entrepriseId}&statut_affectation=non_affecte`)
+        .then((data) => setVehiculesLibres(data.map(v => ({ id: v.id, marque: v.marque ?? '', modele: v.modele ?? '', immatriculation: v.immatriculation ?? '', statut_smartcar: v.statut_smartcar ?? '' }))))
+        .catch(console.error);
     }
   }, [open, entrepriseId]);
 
   useEffect(() => {
     if (form.filiale_id) {
-      supabase.from("sites").select("id, nom").eq("filiale_id", form.filiale_id).then(({ data }) => {
-        if (data) setSites(data);
-      });
+      apiFetch<{ id: string; nom: string }[]>(`/api/filiales/${form.filiale_id}/sites`).then(setSites).catch(console.error);
     } else {
       setSites([]);
     }
@@ -57,21 +52,29 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
     e.preventDefault();
     setLoading(true);
     try {
-      // Create profile (without user_id - will be linked when collaborateur activates account)
-      const { data: profileData, error: profileError } = await supabase.from("profiles").insert({
-        ...form,
-        entreprise_id: entrepriseId,
-        filiale_id: form.filiale_id || null,
-        site_id: form.site_id || null,
-      }).select("id").single();
-      if (profileError) throw profileError;
+      const profileData = await apiFetch<any>("/api/collaborateurs", {
+        method: "POST",
+        body: JSON.stringify({
+          nom: form.nom,
+          prenom: form.prenom,
+          email: form.email,
+          telephone: form.telephone || null,
+          entreprise_id: entrepriseId,
+          filiale_id: form.filiale_id || null,
+          site_id: form.site_id || null,
+          role: "collaborateur",
+          is_active: true,
+        }),
+      });
 
-      // If existing vehicle selected, assign it
       if (vehicleOption === "existant" && selectedVehiculeId && profileData) {
-        await supabase.from("vehicules").update({
-          collaborateur_id: profileData.id,
-          statut_affectation: "affecte",
-        }).eq("id", selectedVehiculeId);
+        await apiFetch(`/api/vehicules/${selectedVehiculeId}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            collaborateur_id: profileData.id,
+            statut_affectation: "affecte",
+          }),
+        });
       }
 
       onCreated();

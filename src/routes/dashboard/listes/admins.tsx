@@ -1,19 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
+import { Download, Plus, Search } from "lucide-react";
+import CreateUserDialog from "@/components/CreateUserDialog";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Search, Eye, Archive, Download } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 import { exportCSV } from "@/lib/export";
 
 export const Route = createFileRoute("/dashboard/listes/admins")({
   component: ListeAdmins,
-  head: () => ({ meta: [{ title: "ChargiZ — Admins" }] }),
+  head: () => ({ meta: [{ title: "ChargiZ - Admins" }] }),
 });
 
 interface AdminUser {
   id: string;
-  nom: string;
-  prenom: string;
+  full_name: string | null;
+  username: string;
   email: string;
   is_active: boolean;
   created_at: string;
@@ -21,9 +22,10 @@ interface AdminUser {
 }
 
 function ListeAdmins() {
-  const { role, loading } = useAuth();
+  const { role, profile, loading } = useAuth();
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
     if (loading || role !== "superadmin") return;
@@ -31,31 +33,8 @@ function ListeAdmins() {
   }, [loading, role]);
 
   async function loadData() {
-    // Get admin & superadmin roles
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("user_id, role")
-      .in("role", ["admin", "superadmin"]);
-
-    if (!roles || roles.length === 0) {
-      setAdmins([]);
-      return;
-    }
-
-    const userIds = roles.map(r => r.user_id);
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, nom, prenom, email, is_active, created_at, user_id")
-      .in("user_id", userIds)
-      .order("nom");
-
-    if (profiles) {
-      const merged = profiles.map(p => ({
-        ...p,
-        role: roles.find(r => r.user_id === p.user_id)?.role || "admin",
-      }));
-      setAdmins(merged);
-    }
+    const users = await apiFetch<AdminUser[]>("/api/users");
+    setAdmins(users.filter((user) => user.role === "admin" || user.role === "superadmin"));
   }
 
   if (loading) {
@@ -69,13 +48,13 @@ function ListeAdmins() {
   if (role !== "superadmin") {
     return (
       <div className="p-4 sm:p-6 md:p-8">
-        <p className="text-muted-foreground">Accès réservé au SuperAdmin.</p>
+        <p className="text-muted-foreground">Acces reserve au SuperAdmin.</p>
       </div>
     );
   }
 
-  const filtered = admins.filter(a =>
-    !search || `${a.nom} ${a.prenom} ${a.email}`.toLowerCase().includes(search.toLowerCase())
+  const filtered = admins.filter((admin) =>
+    !search || `${admin.full_name || ""} ${admin.username} ${admin.email}`.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -85,20 +64,32 @@ function ListeAdmins() {
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Admins</h1>
           <p className="mt-1 text-sm text-muted-foreground">Liste des administrateurs de la plateforme</p>
         </div>
-        <button onClick={() => exportCSV("admins", filtered.map(a => ({
-          Nom: a.nom, Prénom: a.prenom, Email: a.email, Rôle: a.role,
-          État: a.is_active ? "Actif" : "Inactif",
-          "Date création": new Date(a.created_at).toLocaleDateString("fr-FR"),
-        })))} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
-          <Download className="h-4 w-4" /> Exporter
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={() => exportCSV("admins", filtered.map((admin) => ({
+            Nom: admin.full_name || admin.username,
+            Email: admin.email,
+            Role: admin.role,
+            Etat: admin.is_active ? "Actif" : "Inactif",
+            "Date creation": new Date(admin.created_at).toLocaleDateString("fr-FR"),
+          })))} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
+            <Download className="h-4 w-4" /> Exporter
+          </button>
+          <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
+            <Plus className="h-4 w-4" /> Ajouter un admin
+          </button>
+        </div>
       </div>
 
       <div className="mb-6">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input type="text" placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+          <input
+            type="text"
+            placeholder="Rechercher..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
         </div>
       </div>
 
@@ -108,28 +99,28 @@ function ListeAdmins() {
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Nom</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Prénom</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Identifiant</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Email</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Rôle</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">État</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Role</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Etat</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Aucun admin trouvé</td></tr>
-              ) : filtered.map(a => (
-                <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4 font-medium text-card-foreground">{a.nom}</td>
-                  <td className="px-6 py-4 text-card-foreground">{a.prenom}</td>
-                  <td className="px-6 py-4 text-card-foreground">{a.email}</td>
+                <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Aucun admin trouve</td></tr>
+              ) : filtered.map((admin) => (
+                <tr key={admin.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  <td className="px-6 py-4 font-medium text-card-foreground">{admin.full_name || admin.username}</td>
+                  <td className="px-6 py-4 text-card-foreground">{admin.username}</td>
+                  <td className="px-6 py-4 text-card-foreground">{admin.email}</td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-primary/10 text-primary capitalize">
-                      {a.role.replace(/_/g, " ")}
+                      {admin.role.replace(/_/g, " ")}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${a.is_active ? "bg-chargiz-teal/10 text-chargiz-teal" : "bg-destructive/10 text-destructive"}`}>
-                      {a.is_active ? "Actif" : "Inactif"}
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${admin.is_active ? "bg-chargiz-teal/10 text-chargiz-teal" : "bg-destructive/10 text-destructive"}`}>
+                      {admin.is_active ? "Actif" : "Inactif"}
                     </span>
                   </td>
                 </tr>
@@ -138,6 +129,15 @@ function ListeAdmins() {
           </table>
         </div>
       </div>
+
+      <CreateUserDialog
+        actorRole="superadmin"
+        profile={profile}
+        defaultRole="admin"
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        onCreated={loadData}
+      />
     </div>
   );
 }

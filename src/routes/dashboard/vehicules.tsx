@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import CreateVehiculeDialog from "@/components/CreateVehiculeDialog";
 import { Plus, Search, Car, Edit, Trash2, X } from "lucide-react";
@@ -43,27 +43,44 @@ function VehiculesPage() {
   }, [entrepriseId]);
 
   async function loadVehicules() {
-    const { data } = await supabase.from("vehicules").select("*").eq("entreprise_id", entrepriseId);
-    if (data) setVehicules(data as Vehicule[]);
+    try {
+      const data = await apiFetch<Vehicule[]>(`/api/vehicules?entreprise_id=${entrepriseId}`);
+      setVehicules(data);
+    } catch (err) {
+      console.error("Error loading vehicles:", err);
+    }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm("Voulez-vous supprimer ce véhicule ?")) return;
-    await supabase.from("vehicules").delete().eq("id", id);
-    loadVehicules();
+    try {
+      await apiFetch(`/api/vehicules/${id}`, { method: "DELETE" });
+      loadVehicules();
+    } catch (err) {
+      console.error("Error deleting vehicle:", err);
+      alert("Erreur lors de la suppression du véhicule");
+    }
   };
 
   const handleEditSave = async () => {
     if (!editVeh) return;
-    await supabase.from("vehicules").update({
-      marque: editVeh.marque,
-      modele: editVeh.modele,
-      immatriculation: editVeh.immatriculation,
-      vin: editVeh.vin,
-      capacite_batterie: editVeh.capacite_batterie,
-    }).eq("id", editVeh.id);
-    setEditVeh(null);
-    loadVehicules();
+    try {
+      await apiFetch(`/api/vehicules/${editVeh.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          marque: editVeh.marque,
+          modele: editVeh.modele,
+          immatriculation: editVeh.immatriculation,
+          vin: editVeh.vin,
+          capacite_batterie: editVeh.capacite_batterie,
+        }),
+      });
+      setEditVeh(null);
+      loadVehicules();
+    } catch (err) {
+      console.error("Error updating vehicle:", err);
+      alert("Erreur lors de la mise à jour du véhicule");
+    }
   };
 
   const filtered = vehicules.filter(v => {

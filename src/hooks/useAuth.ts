@@ -1,13 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
-import type { User, Session } from "@supabase/supabase-js";
+import { useEffect, useState } from "react";
+import { API_URL, TOKEN_STORAGE_KEY, apiFetch } from "@/lib/api";
 
 export type AppRole =
   | "superadmin"
-  | "admin"
   | "gestionnaire_entreprise"
-  | "gestionnaire_filiale"
-  | "gestionnaire_site"
   | "collaborateur";
 
 export interface Profile {
@@ -31,142 +27,211 @@ export interface Profile {
   is_active: boolean;
 }
 
-// Cache simple en mémoire pour éviter les refetch role/profile à chaque montage
-const cache: { userId?: string; role?: AppRole | null; profile?: Profile | null } = {};
+interface AuthUser {
+  id: string;
+  email: string;
+  username: string;
+  full_name: string | null;
+  role: AppRole;
+  entreprise_id: string | null;
+  filiale_id: string | null;
+  site_id: string | null;
+  is_active: boolean;
+}
+
+interface AuthSession {
+  access_token: string;
+  token_type: string;
+}
+
+const cache: {
+  user?: AuthUser | null;
+  session?: AuthSession | null;
+  role?: AppRole | null;
+  profile?: Profile | null;
+} = {};
+
+function splitFullName(fullName: string | null) {
+  const value = (fullName || "").trim();
+  if (!value) {
+    return { prenom: "Utilisateur", nom: "" };
+  }
+  const parts = value.split(/\s+/);
+  return {
+    prenom: parts[0] || "Utilisateur",
+    nom: parts.slice(1).join(" "),
+  };
+}
+
+function buildProfile(user: AuthUser): Profile {
+  const { prenom, nom } = splitFullName(user.full_name);
+  return {
+    id: user.id,
+    user_id: user.id,
+    nom,
+    prenom,
+    email: user.email,
+    telephone: null,
+    adresse: null,
+    code_postal: null,
+    ville: null,
+    pays: "France",
+    entreprise_id: user.entreprise_id,
+    filiale_id: user.filiale_id,
+    site_id: user.site_id,
+    cout_kwh_domicile: null,
+    jours_suivi: [],
+    horaires_suivi: {},
+    jours_conge: [],
+    is_active: user.is_active,
+  };
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  try {
+    const payload = await response.json();
+    return payload.detail || payload.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(cache.user ?? null);
+  const [session, setSession] = useState<AuthSession | null>(cache.session ?? null);
   const [role, setRole] = useState<AppRole | null>(cache.role ?? null);
   const [profile, setProfile] = useState<Profile | null>(cache.profile ?? null);
-  const [loading, setLoading] = useState(!cache.userId);
-
-  const fetchRole = useCallback(async (userId: string) => {
-    if (cache.userId === userId && cache.role !== undefined) {
-      setRole(cache.role);
-      return;
-    }
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .limit(1)
-      .maybeSingle();
-    const r = (data?.role as AppRole) ?? null;
-    cache.userId = userId;
-    cache.role = r;
-    setRole(r);
-  }, []);
-
-  const fetchProfile = useCallback(async (userId: string) => {
-    if (cache.userId === userId && cache.profile !== undefined) {
-      setProfile(cache.profile);
-      return;
-    }
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", userId)
-      .limit(1)
-      .maybeSingle();
-    const p = (data as Profile) ?? null;
-    cache.userId = userId;
-    cache.profile = p;
-    setProfile(p);
-  }, []);
+  const [loading, setLoading] = useState(!cache.user);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await Promise.all([
-            fetchRole(session.user.id),
-            fetchProfile(session.user.id),
-          ]);
-        } else {
-          setRole(null);
-          setProfile(null);
-        }
-        setLoading(false);
-      }
-    );
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        Promise.all([
-          fetchRole(session.user.id),
-          fetchProfile(session.user.id),
-        ]).then(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
+    apiFetch<AuthUser>("/auth/me", {}, token)
+      .then((currentUser) => {
+        const nextSession: AuthSession = {
+          access_token: token,
+          token_type: "bearer",
+        };
+        const nextProfile = buildProfile(currentUser);
+        cache.user = currentUser;
+        cache.session = nextSession;
+        cache.role = currentUser.role;
+        cache.profile = nextProfile;
+        setUser(currentUser);
+        setSession(nextSession);
+        setRole(currentUser.role);
+        setProfile(nextProfile);
+      })
+      .catch(() => {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        cache.user = null;
+        cache.session = null;
+        cache.role = null;
+        cache.profile = null;
+        setUser(null);
+        setSession(null);
+        setRole(null);
+        setProfile(null);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const signIn = async (identifier: string, password: string) => {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        username: identifier,
+        password,
+      }),
     });
 
-    return () => subscription.unsubscribe();
-  }, [fetchRole, fetchProfile]);
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, "Erreur de connexion"));
+    }
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    const authSession = (await response.json()) as AuthSession;
+    localStorage.setItem(TOKEN_STORAGE_KEY, authSession.access_token);
+
+    const currentUser = await apiFetch<AuthUser>("/auth/me", {}, authSession.access_token);
+    const nextProfile = buildProfile(currentUser);
+
+    cache.user = currentUser;
+    cache.session = authSession;
+    cache.role = currentUser.role;
+    cache.profile = nextProfile;
+
+    setUser(currentUser);
+    setSession(authSession);
+    setRole(currentUser.role);
+    setProfile(nextProfile);
   };
 
   const signOut = async () => {
-    cache.userId = undefined;
-    cache.role = undefined;
-    cache.profile = undefined;
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    cache.user = null;
+    cache.session = null;
+    cache.role = null;
+    cache.profile = null;
     setUser(null);
     setSession(null);
     setRole(null);
     setProfile(null);
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.warn("signOut error", e);
-    }
-    // Force un reset complet de l'app pour éviter tout état résiduel
     window.location.href = "/";
   };
 
-  const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) throw error;
+  const resetPassword = async (_email: string) => {
+    throw new Error("La réinitialisation du mot de passe n'est pas encore branchée sur le nouveau backend.");
   };
 
-  const updatePassword = async (password: string) => {
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) throw error;
+  const updatePassword = async (oldPassword: string, newPassword: string) => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) throw new Error("Non authentifié");
+
+    const response = await fetch(`${API_URL}/auth/change-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        old_password: oldPassword,
+        new_password: newPassword,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, "Erreur lors du changement de mot de passe"));
+    }
   };
 
   const canManage = (targetRole: AppRole): boolean => {
     if (!role) return false;
-    const hierarchy: AppRole[] = [
-      "superadmin",
-      "admin",
-      "gestionnaire_entreprise",
-      "gestionnaire_filiale",
-      "gestionnaire_site",
-      "collaborateur",
-    ];
-    return hierarchy.indexOf(role) < hierarchy.indexOf(targetRole);
+    const manageableRoles: Record<AppRole, AppRole[]> = {
+      superadmin: ["gestionnaire_entreprise", "collaborateur"],
+      gestionnaire_entreprise: ["collaborateur"],
+      collaborateur: [],
+    };
+    return manageableRoles[role]?.includes(targetRole) ?? false;
   };
 
   const isAtLeast = (minRole: AppRole): boolean => {
     if (!role) return false;
     const hierarchy: AppRole[] = [
       "superadmin",
-      "admin",
       "gestionnaire_entreprise",
-      "gestionnaire_filiale",
-      "gestionnaire_site",
       "collaborateur",
     ];
-    return hierarchy.indexOf(role) <= hierarchy.indexOf(minRole);
+    const roleIndex = hierarchy.indexOf(role);
+    const minRoleIndex = hierarchy.indexOf(minRole);
+    if (roleIndex === -1 || minRoleIndex === -1) return false;
+    return roleIndex <= minRoleIndex;
   };
 
   return {
