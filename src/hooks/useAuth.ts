@@ -108,7 +108,7 @@ export function useAuth() {
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (!token) {
+    if (!token || !API_URL) {
       setLoading(false);
       return;
     }
