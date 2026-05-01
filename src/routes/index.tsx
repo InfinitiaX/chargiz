@@ -1,16 +1,15 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import logoChargiz from "@/assets/logo-chargiz.png";
-import loginHero from "@/assets/login-hero.jpg";
-import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Front-only demo: bypass login and land directly on the dashboard.
 export const Route = createFileRoute("/")({
-  component: LoginPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/dashboard" });
+  },
+  component: () => null,
   head: () => ({
     meta: [
-      { title: "ChargiZ — Connexion" },
-      { name: "description", content: "Connectez-vous à votre espace ChargiZ pour gérer les recharges de véhicules électriques." },
+      { title: "ChargiZ — Démo" },
+      { name: "description", content: "Maquette ChargiZ : suivi et gestion des recharges de véhicules électriques." },
     ],
   }),
 });
