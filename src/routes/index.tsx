@@ -50,11 +50,26 @@ function LoginPage() {
     <div className="flex min-h-screen">
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col items-center justify-center p-12">
-        <img src={loginHero} alt="Borne de recharge ChargiZ" className="absolute inset-0 h-full w-full object-cover" />
+        <img
+          src={loginHero}
+          alt="Borne de recharge ChargiZ"
+          width={1280}
+          height={1600}
+          fetchPriority="high"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-primary via-primary/80 to-primary/30" />
         <div className="relative z-10 max-w-md text-center">
           <div className="mb-8 flex justify-center">
-            <img src={logoChargiz} alt="ChargiZ" className="h-14 w-auto drop-shadow-lg" />
+            <img
+              src={logoChargiz}
+              alt="ChargiZ"
+              width={224}
+              height={56}
+              decoding="async"
+              className="h-14 w-auto drop-shadow-lg"
+            />
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-primary-foreground">
             La recharge électrique,
