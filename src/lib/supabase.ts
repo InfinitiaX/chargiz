@@ -1,67 +1,93 @@
-type SupabaseResult<T> = {
-  data: T;
+// Migration shim — kept so existing screens still compile while we move
+// every page to the new src/api/ layer. No network call to Supabase is
+// performed; everything resolves to empty data of the correct shape so
+// the UI keeps rendering without runtime crashes.
+
+type SupabaseListResult<TRow> = {
+  data: TRow[];
+  error: Error | null;
+  count: number | null;
+};
+
+type SupabaseSingleResult<TRow> = {
+  data: TRow | null;
+  error: Error | null;
+  count: number | null;
+};
+
+type SupabaseMutationResult<TRow> = {
+  data: TRow | null;
   error: Error | null;
   count: number | null;
 };
 
 const MIGRATION_MESSAGE =
-  "Supabase est desactive pendant la migration vers le backend Chargiz.";
+  "Supabase est désactivé pendant la migration vers le backend ChargiZ.";
 
-class SupabaseQueryStub<TData> implements PromiseLike<SupabaseResult<TData>> {
-  private mode: "list" | "single" | "mutation";
+class SupabaseQueryBuilder<TRow> implements PromiseLike<SupabaseListResult<TRow>> {
+  protected mode: "list" | "single" | "mutation" = "list";
 
-  constructor(mode: "list" | "single" | "mutation" = "list") {
-    this.mode = mode;
+  // --- selection / mutation ---
+  select<TPicked = TRow>(..._args: unknown[]): SupabaseQueryBuilder<TPicked> {
+    return this as unknown as SupabaseQueryBuilder<TPicked>;
   }
 
-  select(..._args: unknown[]) {
-    return this;
-  }
-
-  insert(..._args: unknown[]) {
+  insert(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
     this.mode = "mutation";
     return this;
   }
 
-  update(..._args: unknown[]) {
+  update(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
     this.mode = "mutation";
     return this;
   }
 
-  delete(..._args: unknown[]) {
+  delete(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
     this.mode = "mutation";
     return this;
   }
 
-  eq(..._args: unknown[]) {
+  upsert(..._args: unknown[]): SupabaseQueryBuilder<TRow> {
+    this.mode = "mutation";
     return this;
   }
 
-  in(..._args: unknown[]) {
-    return this;
-  }
+  // --- filters ---
+  eq(..._args: unknown[]) { return this; }
+  neq(..._args: unknown[]) { return this; }
+  in(..._args: unknown[]) { return this; }
+  gt(..._args: unknown[]) { return this; }
+  gte(..._args: unknown[]) { return this; }
+  lt(..._args: unknown[]) { return this; }
+  lte(..._args: unknown[]) { return this; }
+  like(..._args: unknown[]) { return this; }
+  ilike(..._args: unknown[]) { return this; }
+  is(..._args: unknown[]) { return this; }
+  not(..._args: unknown[]) { return this; }
+  or(..._args: unknown[]) { return this; }
+  contains(..._args: unknown[]) { return this; }
+  match(..._args: unknown[]) { return this; }
 
-  order(..._args: unknown[]) {
-    return this;
-  }
+  // --- ordering / paging ---
+  order(..._args: unknown[]) { return this; }
+  limit(..._args: unknown[]) { return this; }
+  range(..._args: unknown[]) { return this; }
 
-  limit(..._args: unknown[]) {
-    return this;
-  }
-
-  maybeSingle(..._args: unknown[]) {
+  // --- result-shaping ---
+  maybeSingle(): PromiseLike<SupabaseSingleResult<TRow>> {
     this.mode = "single";
-    return this as unknown as SupabaseQueryStub<null>;
+    return Promise.resolve({ data: null, error: null, count: 0 });
   }
 
-  single(..._args: unknown[]) {
+  single(): PromiseLike<SupabaseSingleResult<TRow>> {
     this.mode = "single";
-    return this as unknown as SupabaseQueryStub<null>;
+    return Promise.resolve({ data: null, error: null, count: 0 });
   }
 
-  then<TResult1 = SupabaseResult<TData>, TResult2 = never>(
+  // --- promise interface (default = list) ---
+  then<TResult1 = SupabaseListResult<TRow>, TResult2 = never>(
     onfulfilled?:
-      | ((value: SupabaseResult<TData>) => TResult1 | PromiseLike<TResult1>)
+      | ((value: SupabaseListResult<TRow>) => TResult1 | PromiseLike<TResult1>)
       | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): PromiseLike<TResult1 | TResult2> {
@@ -78,63 +104,34 @@ class SupabaseQueryStub<TData> implements PromiseLike<SupabaseResult<TData>> {
     return Promise.resolve(this.buildResult()).finally(onfinally ?? undefined);
   }
 
-  private buildResult(): SupabaseResult<TData> {
-    if (this.mode === "single") {
-      return {
-        data: null as TData,
-        error: null,
-        count: 0,
-      };
-    }
-
+  private buildResult(): SupabaseListResult<TRow> | SupabaseMutationResult<TRow> {
     if (this.mode === "mutation") {
-      return {
-        data: null as TData,
-        error: null,
-        count: 0,
-      };
+      return { data: null, error: null, count: 0 };
     }
-
-    return {
-      data: [] as TData,
-      error: null,
-      count: 0,
-    };
+    return { data: [] as TRow[], error: null, count: 0 };
   }
 }
 
-// Temporary migration shim:
-// we keep the old import path so legacy screens still render,
-// but every Supabase call is neutralized locally and no network
-// request is sent to Supabase anymore.
+type AuthResponse<T> = { data: T | null; error: Error | null };
+
+async function migrationError<T>(): Promise<AuthResponse<T>> {
+  return { data: null, error: new Error(MIGRATION_MESSAGE) };
+}
+
 export const supabase = {
-  from<TData = unknown>(_table: string) {
-    return new SupabaseQueryStub<TData[]>();
+  from<TRow = Record<string, unknown>>(_table: string): SupabaseQueryBuilder<TRow> {
+    return new SupabaseQueryBuilder<TRow>();
   },
   auth: {
-    async signInWithPassword(..._args: unknown[]) {
-      return {
-        data: null,
-        error: new Error(MIGRATION_MESSAGE),
-      };
-    },
-    async resetPasswordForEmail(..._args: unknown[]) {
-      return {
-        data: null,
-        error: new Error(MIGRATION_MESSAGE),
-      };
-    },
-    async updateUser(..._args: unknown[]) {
-      return {
-        data: null,
-        error: new Error(MIGRATION_MESSAGE),
-      };
-    },
-    async getClaims(..._args: unknown[]) {
-      return {
-        data: null,
-        error: new Error(MIGRATION_MESSAGE),
-      };
-    },
+    signInWithPassword: (..._args: unknown[]) => migrationError(),
+    resetPasswordForEmail: (..._args: unknown[]) => migrationError(),
+    updateUser: (..._args: unknown[]) => migrationError(),
+    getClaims: (..._args: unknown[]) => migrationError(),
+    signOut: async () => ({ error: null }),
+    getSession: async () => ({ data: { session: null }, error: null }),
+    getUser: async () => ({ data: { user: null }, error: null }),
+    onAuthStateChange: (_cb: unknown) => ({
+      data: { subscription: { unsubscribe: () => {} } },
+    }),
   },
 };
