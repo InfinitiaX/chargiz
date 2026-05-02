@@ -149,7 +149,7 @@ export const supabase = {
         formData.append("username", email);
         formData.append("password", password);
 
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"}/auth/login`, {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"}/api/auth/login`, {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -166,7 +166,7 @@ export const supabase = {
         setAccessToken(access_token);
 
         // Fetch user data
-        const user = await apiFetch<User>("/auth/me");
+        const user = await apiFetch<User>("/api/auth/me");
         setStoredUser(user);
 
         return { data: { user, session: { access_token } }, error: null };

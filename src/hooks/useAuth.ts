@@ -110,7 +110,7 @@ export function useAuth() {
       return;
     }
 
-    apiFetch<AuthUser>("/auth/me", {}, token)
+    apiFetch<AuthUser>("/api/auth/me", {}, token)
       .then((currentUser) => {
         const nextSession: AuthSession = {
           access_token: token,
@@ -141,7 +141,7 @@ export function useAuth() {
   }, []);
 
   const signIn = async (identifier: string, password: string) => {
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await fetch(`${API_URL}/api/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -159,7 +159,7 @@ export function useAuth() {
     const authSession = (await response.json()) as AuthSession;
     localStorage.setItem(TOKEN_STORAGE_KEY, authSession.access_token);
 
-    const currentUser = await apiFetch<AuthUser>("/auth/me", {}, authSession.access_token);
+    const currentUser = await apiFetch<AuthUser>("/api/auth/me", {}, authSession.access_token);
     const nextProfile = buildProfile(currentUser);
 
     cache.user = currentUser;
