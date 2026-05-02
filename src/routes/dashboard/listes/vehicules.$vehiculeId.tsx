@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Car } from "lucide-react";
+import { ArrowLeft, Car, User, Calendar, Zap, Gauge, ShieldCheck, History } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export const Route = createFileRoute("/dashboard/listes/vehicules/$vehiculeId")({
   component: FicheVehicule,
@@ -21,100 +21,61 @@ interface Vehicule {
   entreprise_id: string;
 }
 
-interface AffectationRow {
-  collaborateur_nom: string;
-  collaborateur_prenom: string;
-  date_debut: string;
-  date_fin: string | null;
+interface Collaborateur {
+  id: string;
+  nom: string;
+  prenom: string;
 }
 
-interface SessionRow {
+interface Session {
   id: string;
-  collaborateur_nom: string;
-  collaborateur_prenom: string;
-  jour_semaine: string | null;
-  date_debut: string | null;
-  energie_kwh: number | null;
-  cout_euro: number | null;
+  date_session: string;
+  energie_kwh: number;
+  cout_euro: number;
   kilometrage: number | null;
+  is_domicile: boolean;
 }
 
 function FicheVehicule() {
   const { vehiculeId } = Route.useParams();
   const [vehicule, setVehicule] = useState<Vehicule | null>(null);
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [currentCollab, setCurrentCollab] = useState<{ nom: string; prenom: string } | null>(null);
+  const [collab, setCollab] = useState<Collaborateur | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehiculeId]);
 
   async function loadData() {
     setLoading(true);
-    setError(null);
     try {
-      const { data: v, error: vErr } = await supabase.from("vehicules").select("*").eq("id", vehiculeId).maybeSingle();
-      if (vErr) throw vErr;
-      if (!v) {
-        setError("Véhicule introuvable");
-        setLoading(false);
-        return;
-      }
-      setVehicule(v as Vehicule);
+      const v = await apiFetch<Vehicule>(`/api/vehicules/${vehiculeId}`);
+      setVehicule(v);
+
       if (v.collaborateur_id) {
-        const { data: p } = await supabase.from("profiles").select("nom, prenom").eq("id", v.collaborateur_id).maybeSingle();
-        if (p) setCurrentCollab(p);
+        const c = await apiFetch<Collaborateur>(`/api/collaborateurs/${v.collaborateur_id}`);
+        setCollab(c);
       }
 
-      const { data: sess } = await supabase.from("sessions_recharge")
-        .select("id, collaborateur_id, jour_semaine, date_debut, energie_kwh, cout_euro, kilometrage")
-        .eq("vehicule_id", vehiculeId)
-        .order("date_debut", { ascending: false })
-        .limit(50);
-
-      if (sess && sess.length > 0) {
-        const collabIds = [...new Set(sess.map(s => s.collaborateur_id).filter(Boolean))];
-        const profileMap: Record<string, { nom: string; prenom: string }> = {};
-        if (collabIds.length > 0) {
-          const { data: profiles } = await supabase.from("profiles").select("id, nom, prenom").in("id", collabIds);
-          if (profiles) profiles.forEach(p => { profileMap[p.id] = p; });
-        }
-        setSessions(sess.map(s => ({
-          id: s.id,
-          collaborateur_nom: profileMap[s.collaborateur_id]?.nom || "—",
-          collaborateur_prenom: profileMap[s.collaborateur_id]?.prenom || "",
-          jour_semaine: s.jour_semaine,
-          date_debut: s.date_debut,
-          energie_kwh: s.energie_kwh,
-          cout_euro: s.cout_euro,
-          kilometrage: s.kilometrage,
-        })));
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement");
+      const ss = await apiFetch<Session[]>(`/api/sessions?vehicule_id=${vehiculeId}`);
+      setSessions(ss);
+    } catch (err) {
+      console.error("Error loading vehicle details:", err);
     } finally {
       setLoading(false);
     }
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-    </div>
-  );
-  if (error || !vehicule) return (
-    <div className="p-4 sm:p-6 md:p-8">
-      <Link to="/dashboard/listes/vehicules" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
-        <ArrowLeft className="h-4 w-4" /> Retour aux véhicules
-      </Link>
-      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-destructive">
-        {error || "Véhicule introuvable"}
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (!vehicule) return <div className="p-8 text-center text-muted-foreground">Véhicule non trouvé.</div>;
 
   return (
     <div className="p-4 sm:p-6 md:p-8">
@@ -130,82 +91,101 @@ function FicheVehicule() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-foreground">{vehicule.marque || "—"} {vehicule.modele || ""}</h1>
-          <p className="text-sm text-muted-foreground font-mono">{vehicule.immatriculation || "—"}</p>
+          <p className="text-sm text-muted-foreground font-mono">{vehicule.immatriculation || "Immatriculation non renseignée"}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Informations générales */}
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-card-foreground mb-4">Informations générales</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            <div><p className="text-muted-foreground">Marque</p><p className="font-medium text-card-foreground">{vehicule.marque || "—"}</p></div>
-            <div><p className="text-muted-foreground">Modèle</p><p className="font-medium text-card-foreground">{vehicule.modele || "—"}</p></div>
-            <div><p className="text-muted-foreground">VIN</p><p className="font-medium font-mono text-xs text-card-foreground">{vehicule.vin || "—"}</p></div>
-            <div><p className="text-muted-foreground">Immatriculation</p><p className="font-medium font-mono text-card-foreground">{vehicule.immatriculation || "—"}</p></div>
-            <div><p className="text-muted-foreground">Capacité batterie</p><p className="font-medium text-card-foreground">{vehicule.capacite_batterie ? `${vehicule.capacite_batterie} kWh` : "—"}</p></div>
-            <div><p className="text-muted-foreground">Collaborateur actuel</p><p className="font-medium text-card-foreground">{currentCollab ? `${currentCollab.prenom} ${currentCollab.nom}` : "Aucun"}</p></div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Info Card */}
+        <div className="space-y-6 lg:col-span-1">
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" /> Détails techniques
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-muted-foreground">VIN</p>
+                <p className="text-sm font-medium text-card-foreground font-mono">{vehicule.vin || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Capacité batterie</p>
+                <p className="text-sm font-medium text-card-foreground flex items-center gap-1">
+                  <Zap className="h-3 w-3 text-yellow-500" /> {vehicule.capacite_batterie ? `${vehicule.capacite_batterie} kWh` : "Non renseignée"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Statut d'affectation</p>
+                <span className={`mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  vehicule.statut_affectation === "affecte" ? "bg-chargiz-teal/10 text-chargiz-teal"
+                  : "bg-kpi-sessions/10 text-kpi-sessions"
+                }`}>
+                  {vehicule.statut_affectation === "affecte" ? "Affecté" : "Disponible"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" /> Collaborateur affecté
+            </h3>
+            {collab ? (
+              <Link to="/dashboard/collaborateur/$id" params={{ id: collab.id }} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-card-foreground">{collab.prenom} {collab.nom}</p>
+                  <p className="text-xs text-muted-foreground">Voir la fiche</p>
+                </div>
+              </Link>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Aucun collaborateur affecté.</p>
+            )}
           </div>
         </div>
 
-        {/* État actuel */}
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-card-foreground mb-4">État actuel</h3>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Statut d'affectation</p>
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-                vehicule.statut_affectation === "affecte" ? "bg-chargiz-teal/10 text-chargiz-teal"
-                : vehicule.statut_affectation === "archive" ? "bg-muted text-muted-foreground"
-                : "bg-kpi-sessions/10 text-kpi-sessions"
-              }`}>
-                {vehicule.statut_affectation === "affecte" ? "Affecté" : vehicule.statut_affectation === "archive" ? "Archivé" : "Non affecté"}
-              </span>
+        {/* Sessions Card */}
+        <div className="lg:col-span-2">
+          <div className="rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <div className="flex items-center gap-2">
+                <History className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold text-card-foreground">Historique des recharges</h3>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Statut de connexion</p>
-              <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${vehicule.statut_smartcar === "connecte" ? "text-chargiz-teal" : vehicule.statut_smartcar === "suspendu" ? "text-kpi-away" : "text-muted-foreground"}`}>
-                <span className={`h-2 w-2 rounded-full ${vehicule.statut_smartcar === "connecte" ? "bg-chargiz-teal" : vehicule.statut_smartcar === "suspendu" ? "bg-kpi-away" : "bg-muted-foreground"}`} />
-                {vehicule.statut_smartcar === "connecte" ? "Connecté" : vehicule.statut_smartcar === "suspendu" ? "Suspendu" : "Déconnecté"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Historique des recharges */}
-        <div className="rounded-xl border border-border bg-card shadow-sm lg:col-span-2">
-          <div className="border-b border-border px-6 py-4">
-            <h3 className="text-lg font-semibold text-card-foreground">Historique des recharges</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Nom</th>
-                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Prénom</th>
-                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Jour</th>
-                  <th className="px-6 py-3 text-left font-medium text-muted-foreground">Date</th>
-                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">kWh</th>
-                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">Coût</th>
-                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">Km</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessions.length === 0 ? (
-                  <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">Aucune session</td></tr>
-                ) : sessions.map(s => (
-                  <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                    <td className="px-6 py-3 text-card-foreground">{s.collaborateur_nom}</td>
-                    <td className="px-6 py-3 text-card-foreground">{s.collaborateur_prenom}</td>
-                    <td className="px-6 py-3 text-card-foreground">{s.jour_semaine || "—"}</td>
-                    <td className="px-6 py-3 text-card-foreground">{s.date_debut ? new Date(s.date_debut).toLocaleDateString("fr-FR") : "—"}</td>
-                    <td className="px-6 py-3 text-right text-card-foreground">{s.energie_kwh?.toFixed(2) || "0"}</td>
-                    <td className="px-6 py-3 text-right text-card-foreground">{s.cout_euro?.toFixed(2) || "0"} €</td>
-                    <td className="px-6 py-3 text-right text-card-foreground">{s.kilometrage?.toFixed(1) || "—"}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50 text-left">
+                    <th className="px-6 py-3 font-medium text-muted-foreground">Date</th>
+                    <th className="px-6 py-3 font-medium text-muted-foreground">Lieu</th>
+                    <th className="px-6 py-3 text-right font-medium text-muted-foreground">Énergie (kWh)</th>
+                    <th className="px-6 py-3 text-right font-medium text-muted-foreground">Km (Odomètre)</th>
+                    <th className="px-6 py-3 text-right font-medium text-muted-foreground">Coût (€)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {sessions.length === 0 ? (
+                    <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Aucune session enregistrée pour ce véhicule</td></tr>
+                  ) : sessions.map(s => (
+                    <tr key={s.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-6 py-4 text-card-foreground">{new Date(s.date_session).toLocaleDateString("fr-FR")}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${s.is_domicile ? 'bg-chargiz-teal/10 text-chargiz-teal' : 'bg-kpi-away/10 text-kpi-away'}`}>
+                          {s.is_domicile ? 'Domicile' : 'Extérieur'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right text-card-foreground">{s.energie_kwh.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right text-card-foreground flex items-center justify-end gap-1">
+                        <Gauge className="h-3 w-3 text-muted-foreground" /> {s.kilometrage?.toLocaleString() || "—"}
+                      </td>
+                      <td className="px-6 py-4 text-right text-card-foreground font-medium">{s.cout_euro.toFixed(2)} €</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

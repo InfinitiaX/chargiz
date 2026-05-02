@@ -1,67 +1,136 @@
-// Front-only mock API: routes path strings to mock data so existing
-// apiFetch() callers keep working without a backend.
-import { tableMap, mockCollaborateurs } from "./mockData";
-
-export const API_URL = "";
+// Front layer used to talk to the ChargiZ FastAPI backend.
+export const API_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 export const TOKEN_STORAGE_KEY = "chargiz_access_token";
+export const USER_STORAGE_KEY = "chargiz_user_data";
 
-export function getAccessToken() {
-  return "demo-token";
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  full_name: string | null;
+  role: string;
+  entreprise_id: string | null;
+  filiale_id: string | null;
+  site_id: string | null;
 }
 
-function pickByPath(path: string): unknown {
-  const clean = path.split("?")[0].replace(/^\//, "").replace(/^api\//, "");
-  const parts = clean.split("/").filter(Boolean);
-  const head = parts[0];
+async function readErrorMessage(response: Response, fallback: string) {
+  try {
+    const payload = await response.json();
+    return payload.detail || payload.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
-  switch (head) {
-    case "collaborateurs":
-    case "profiles":
-      if (parts[1]) return mockCollaborateurs.find(c => c.id === parts[1]) ?? null;
-      return tableMap.collaborateurs;
-    case "entreprises":
-      if (parts[1]) return tableMap.entreprises.find(e => e.id === parts[1]) ?? null;
-      return tableMap.entreprises;
-    case "filiales":
-      if (parts[1]) return tableMap.filiales.find(f => f.id === parts[1]) ?? null;
-      return tableMap.filiales;
-    case "sites":
-      if (parts[1]) return tableMap.sites.find(s => s.id === parts[1]) ?? null;
-      return tableMap.sites;
-    case "vehicules":
-      if (parts[1]) return tableMap.vehicules.find(v => v.id === parts[1]) ?? null;
-      return tableMap.vehicules;
-    case "sessions_recharge":
-    case "sessions":
-      return tableMap.sessions_recharge;
-    case "admins":
-      return tableMap.admins;
-    case "auth":
-      if (parts[1] === "me") {
-        return {
-          id: "user-superadmin",
-          email: "demo@chargiz.fr",
-          username: "superadmin",
-          full_name: "Marie Démo",
-          role: "superadmin",
-          entreprise_id: "ent-1",
-          filiale_id: "fil-1",
-          site_id: "site-1",
-          is_active: true,
-        };
-      }
-      return null;
-    default:
-      return [];
+export function getAccessToken() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setAccessToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  if (token) {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  } else {
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    window.localStorage.removeItem(USER_STORAGE_KEY);
+  }
+}
+
+export function getStoredUser(): User | null {
+  if (typeof window === "undefined") return null;
+  const data = window.localStorage.getItem(USER_STORAGE_KEY);
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredUser(user: User | null) {
+  if (typeof window === "undefined") return;
+  if (user) {
+    window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  } else {
+    window.localStorage.removeItem(USER_STORAGE_KEY);
   }
 }
 
 export async function apiFetch<T>(
   path: string,
-  _options: RequestInit = {},
-  _token: string | undefined = undefined,
+  options: RequestInit = {},
+  token: string | undefined = getAccessToken() ?? undefined,
 ): Promise<T> {
-  // Simulate a tiny latency for UX realism
-  await new Promise(r => setTimeout(r, 50));
-  return pickByPath(path) as T;
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+  });
+
+  if (response.status === 401) {
+    setAccessToken(null);
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login") && window.location.pathname !== "/") {
+      window.location.href = "/";
+    }
+    throw new Error("Session expirée");
+  }
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Erreur API"));
+  }
+
+  return response.json() as Promise<T>;
 }
+
+// Resource helpers
+export const api = {
+  entreprises: {
+    list: () => apiFetch<any[]>("/api/entreprises"),
+    get: (id: string) => apiFetch<any>(`/api/entreprises/${id}`),
+    delete: (id: string) => apiFetch<any>(`/api/entreprises/${id}`, { method: "DELETE" }),
+  },
+  collaborateurs: {
+    list: (params?: Record<string, string>) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiFetch<any[]>(`/api/collaborateurs${qs ? `?${qs}` : ""}`);
+    },
+    get: (id: string) => apiFetch<any>(`/api/collaborateurs/${id}`),
+    update: (id: string, data: any) => apiFetch<any>(`/api/collaborateurs/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  },
+  filiales: {
+    list: (params?: Record<string, string>) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiFetch<any[]>(`/api/filiales${qs ? `?${qs}` : ""}`);
+    },
+    get: (id: string) => apiFetch<any>(`/api/filiales/${id}`),
+  },
+  sites: {
+    list: (params?: Record<string, string>) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiFetch<any[]>(`/api/sites${qs ? `?${qs}` : ""}`);
+    },
+    get: (id: string) => apiFetch<any>(`/api/sites/${id}`),
+  },
+  vehicules: {
+    list: (params?: Record<string, string>) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiFetch<any[]>(`/api/vehicules${qs ? `?${qs}` : ""}`);
+    },
+    get: (id: string) => apiFetch<any>(`/api/vehicules/${id}`),
+    update: (id: string, data: any) => apiFetch<any>(`/api/vehicules/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  },
+  sessions: {
+    list: (params?: Record<string, string>) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiFetch<any[]>(`/api/sessions${qs ? `?${qs}` : ""}`);
+    },
+  },
+  stats: {
+    get: (entrepriseId: string) => apiFetch<any>(`/api/entreprises/${entrepriseId}/stats`),
+  }
+};

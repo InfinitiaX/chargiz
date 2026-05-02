@@ -1,129 +1,202 @@
-// Front-only mock client mimicking the subset of the Supabase JS API
-// used by ChargiZ screens. Returns realistic data from src/lib/mockData.ts
-// so the demo maquette stays interactive without any backend.
-import { tableMap } from "./mockData";
+import { apiFetch, setAccessToken, setStoredUser, User } from "./api";
 
-type AnyRow = Record<string, any>;
+// This is a bridge layer that makes existing Supabase-style calls 
+// work with the new FastAPI backend. 
+// It allows the UI to stay as-is while we migrate.
 
-interface CountOptions { count?: "exact" | "planned" | "estimated" }
+type SupabaseResult<T> = {
+  data: T | null;
+  error: any;
+  count?: number | null;
+};
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-class QueryBuilder<TRow = any> implements PromiseLike<{ data: TRow[]; error: null; count: number | null }> {
-  private rows: AnyRow[];
-  private wantCount = false;
-  private orderBy: { col: string; asc: boolean } | null = null;
-  private rangeLimit: number | null = null;
+class SupabaseQueryBuilder<TRow> {
+  private table: string;
+  private filters: Record<string, any> = {};
+  private limitCount: number | null = null;
+  private isCountExact: boolean = false;
 
-  constructor(private table: string) {
-    this.rows = [...(tableMap[table] || [])];
+  constructor(table: string) {
+    this.table = table;
   }
 
-  select<TPicked = TRow>(_cols?: string, opts?: CountOptions): QueryBuilder<TPicked> {
-    if (opts?.count) this.wantCount = true;
-    return this as unknown as QueryBuilder<TPicked>;
-  }
-  insert(payload: AnyRow | AnyRow[]) {
-    const list = Array.isArray(payload) ? payload : [payload];
-    list.forEach((p, i) => {
-      const row = { id: `${this.table}-new-${Date.now()}-${i}`, created_at: new Date().toISOString(), ...p };
-      (tableMap[this.table] ||= []).push(row);
-      this.rows.push(row);
-    });
-    return this;
-  }
-  update(patch: AnyRow) {
-    this.rows = this.rows.map(r => ({ ...r, ...patch }));
-    return this;
-  }
-  delete() { this.rows = []; return this; }
-  upsert(payload: AnyRow | AnyRow[]) { return this.insert(payload); }
-
-  eq(col: string, val: unknown) { this.rows = this.rows.filter(r => r[col] === val); return this; }
-  neq(col: string, val: unknown) { this.rows = this.rows.filter(r => r[col] !== val); return this; }
-  in(col: string, vals: unknown[]) { this.rows = this.rows.filter(r => vals.includes(r[col])); return this; }
-  gt(col: string, val: any) { this.rows = this.rows.filter(r => r[col] > val); return this; }
-  gte(col: string, val: any) { this.rows = this.rows.filter(r => r[col] >= val); return this; }
-  lt(col: string, val: any) { this.rows = this.rows.filter(r => r[col] < val); return this; }
-  lte(col: string, val: any) { this.rows = this.rows.filter(r => r[col] <= val); return this; }
-  like() { return this; }
-  ilike(col: string, pattern: string) {
-    const re = new RegExp(pattern.replace(/%/g, ".*"), "i");
-    this.rows = this.rows.filter(r => re.test(String(r[col] ?? "")));
-    return this;
-  }
-  is(col: string, val: any) { this.rows = this.rows.filter(r => r[col] === val); return this; }
-  not(col: string, _op: string, val: any) { this.rows = this.rows.filter(r => r[col] !== val); return this; }
-  or() { return this; }
-  contains() { return this; }
-  match(filters: AnyRow) {
-    Object.entries(filters).forEach(([k, v]) => { this.rows = this.rows.filter(r => r[k] === v); });
-    return this;
-  }
-
-  order(col: string, opts?: { ascending?: boolean }) {
-    this.orderBy = { col, asc: opts?.ascending !== false };
-    return this;
-  }
-  limit(n: number) { this.rangeLimit = n; return this; }
-  range(from: number, to: number) { this.rows = this.rows.slice(from, to + 1); return this; }
-
-  private build(): TRow[] {
-    let out = [...this.rows];
-    if (this.orderBy) {
-      const { col, asc } = this.orderBy;
-      out.sort((a, b) => {
-        const av = a[col], bv = b[col];
-        if (av == null && bv == null) return 0;
-        if (av == null) return 1;
-        if (bv == null) return -1;
-        if (av < bv) return asc ? -1 : 1;
-        if (av > bv) return asc ? 1 : -1;
-        return 0;
-      });
+  select(columns?: string, options?: { count?: "exact" | "planned" | "estimated" }) {
+    if (options?.count === "exact") {
+      this.isCountExact = true;
     }
-    if (this.rangeLimit != null) out = out.slice(0, this.rangeLimit);
-    return out as TRow[];
+    return this; 
+  }
+  
+  insert(data: any) { 
+    return this.execute("POST", data);
+  }
+  
+  update(data: any) {
+    return this.execute("PATCH", data);
+  }
+  
+  delete() {
+    return this.execute("DELETE");
+  }
+  
+  upsert(data: any) {
+    return this.execute("POST", data);
+  }
+
+  eq(column: string, value: any) {
+    if (value === undefined || value === null) return this;
+    this.filters[column] = value;
+    return this;
+  }
+  
+  neq(column: string, value: any) { return this; }
+  
+  in(column: string, values: any[]) { 
+    if (!values || values.length === 0) return this;
+    this.filters[column] = values.join(",");
+    return this; 
+  }
+  
+  order(column: string, options?: { ascending?: boolean }) { return this; }
+  
+  limit(n: number) { 
+    this.limitCount = n;
+    return this; 
   }
 
   maybeSingle() {
-    const data = this.build()[0] ?? null;
-    return Promise.resolve({ data, error: null, count: data ? 1 : 0 });
-  }
-  single() {
-    const data = this.build()[0] ?? null;
-    return Promise.resolve({ data, error: null, count: data ? 1 : 0 });
+    return this.execute("GET");
   }
 
-  then<TResult1 = { data: TRow[]; error: null; count: number | null }, TResult2 = never>(
-    onfulfilled?: ((value: { data: TRow[]; error: null; count: number | null }) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-  ): PromiseLike<TResult1 | TResult2> {
-    const data = this.build();
-    return Promise.resolve({ data, error: null, count: this.wantCount ? data.length : null }).then(onfulfilled, onrejected);
+  single() {
+    return this.execute("GET");
   }
-  catch(onrejected?: ((reason: unknown) => unknown) | null) {
-    return Promise.resolve(this.build()).catch(onrejected as any);
+
+  async then<TResult1 = SupabaseResult<TRow | TRow[]>>(
+    onfulfilled?: ((value: any) => TResult1 | PromiseLike<TResult1>) | null
+  ): Promise<any> {
+    const result = await this.execute();
+    return onfulfilled ? onfulfilled(result) : result;
   }
-  finally(onfinally?: (() => void) | null) {
-    return Promise.resolve(this.build()).finally(onfinally ?? undefined);
+
+  private async execute(method: string = "GET", body?: any): Promise<SupabaseResult<any>> {
+    try {
+      let path = "";
+      
+      // Mapping tables to FastAPI routes
+      const tableMap: Record<string, string> = {
+        "entreprises": "/api/entreprises",
+        "filiales": "/api/filiales",
+        "sites": "/api/sites",
+        "profiles": "/api/collaborateurs",
+        "collaborateurs": "/api/collaborateurs",
+        "vehicules": "/api/vehicules",
+        "sessions_recharge": "/api/sessions",
+        "user_roles": "/api/users",
+        "users": "/api/users"
+      };
+
+      const baseRoute = tableMap[this.table] || `/api/${this.table}`;
+      path = baseRoute;
+
+      // Special case for ID filter in URL
+      if (this.filters.id && (method === "GET" || method === "PATCH" || method === "DELETE")) {
+        path = `${baseRoute}/${this.filters.id}`;
+        // We keep it in filters for GET query params if needed, 
+        // but usually FastAPI expects it in path.
+      }
+
+      // Build query string for GET
+      if (method === "GET") {
+        const params = new URLSearchParams();
+        Object.entries(this.filters).forEach(([k, v]) => {
+          if (k !== "id") params.append(k, String(v));
+        });
+        if (this.limitCount) params.append("limit", String(this.limitCount));
+        const qs = params.toString();
+        if (qs) path += (path.includes("?") ? "&" : "?") + qs;
+      }
+
+      const data = await apiFetch<any>(path, {
+        method,
+        ...(body ? { body: JSON.stringify(body) } : {})
+      });
+
+      // Handle count for lists
+      let count = null;
+      if (Array.isArray(data)) {
+        count = data.length;
+      } else if (data && typeof data === "object" && this.isCountExact) {
+        count = 1;
+      }
+
+      return { data, error: null, count };
+    } catch (error: any) {
+      console.error(`API Error (${this.table}):`, error);
+      return { data: null, error, count: 0 };
+    }
   }
 }
 
 export const supabase = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  from<TRow = any>(table: string): QueryBuilder<TRow> {
-    return new QueryBuilder<TRow>(table);
+  from<TRow = any>(table: string) {
+    return new SupabaseQueryBuilder<TRow>(table);
   },
   auth: {
-    signInWithPassword: async () => ({ data: { user: null, session: null }, error: null }),
-    resetPasswordForEmail: async () => ({ data: null, error: null }),
-    updateUser: async () => ({ data: { user: null }, error: null }),
-    getClaims: async () => ({ data: null, error: null }),
-    signOut: async () => ({ error: null }),
-    getSession: async () => ({ data: { session: null }, error: null }),
-    getUser: async () => ({ data: { user: null }, error: null }),
-    onAuthStateChange: (_cb: unknown) => ({
-      data: { subscription: { unsubscribe: () => {} } },
-    }),
-  },
+    signInWithPassword: async ({ email, password }: any) => {
+      try {
+        const formData = new URLSearchParams();
+        formData.append("username", email);
+        formData.append("password", password);
+
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"}/auth/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.detail || "Login failed");
+        }
+
+        const { access_token } = await response.json();
+        setAccessToken(access_token);
+
+        // Fetch user data
+        const user = await apiFetch<User>("/auth/me");
+        setStoredUser(user);
+
+        return { data: { user, session: { access_token } }, error: null };
+      } catch (error: any) {
+        return { data: null, error };
+      }
+    },
+    signOut: async () => {
+      setAccessToken(null);
+      setStoredUser(null);
+      return { error: null };
+    },
+    getUser: async () => {
+      try {
+        const user = await apiFetch<User>("/auth/me");
+        return { data: { user }, error: null };
+      } catch (error: any) {
+        return { data: null, error };
+      }
+    },
+    getSession: async () => {
+      const token = localStorage.getItem("chargiz_access_token");
+      if (!token) return { data: { session: null }, error: null };
+      return { data: { session: { access_token: token } }, error: null };
+    },
+    onAuthStateChange: (cb: any) => {
+      return { data: { subscription: { unsubscribe: () => {} } } };
+    },
+    updateUser: async (data: any) => {
+      return { data: null, error: new Error("Not implemented") };
+    }
+  }
 };

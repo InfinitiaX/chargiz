@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import KpiCard from "@/components/KpiCard";
 import { Users, Car, Home, MapPin, Zap, Euro, Calendar } from "lucide-react";
@@ -31,23 +31,31 @@ function StatistiquesPage() {
   }, [entrepriseId, dateFrom, dateTo]);
 
   async function loadStats() {
-    const [collabs, vehicules, sessions] = await Promise.all([
-      supabase.from("profiles").select("id", { count: "exact" }).eq("entreprise_id", entrepriseId).eq("is_active", true),
-      supabase.from("vehicules").select("id", { count: "exact" }).eq("entreprise_id", entrepriseId),
-      supabase.from("sessions_recharge").select("energie_kwh, is_domicile, cout_euro").eq("entreprise_id", entrepriseId)
-        .gte("date_debut", dateFrom).lte("date_debut", dateTo + "T23:59:59"),
-    ]);
+    try {
+      const [collabs, vehicules, sessions] = await Promise.all([
+        api.collaborateurs.list({ entreprise_id: entrepriseId, active_only: "true" }),
+        api.vehicules.list({ entreprise_id: entrepriseId }),
+        api.sessions.list({ entreprise_id: entrepriseId }), // Note: backend doesn't support date filtering yet in list_sessions, but we can filter client-side or update backend
+      ]);
 
-    const sess = sessions.data || [];
-    setStats({
-      nbConducteurs: collabs.count || 0,
-      nbVehicules: vehicules.count || 0,
-      sessionsDom: sess.filter(s => s.is_domicile).length,
-      sessionsHors: sess.filter(s => !s.is_domicile).length,
-      energieDom: sess.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0),
-      energieHors: sess.filter(s => !s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0),
-      coutTotal: sess.filter(s => s.is_domicile).reduce((a, s) => a + (s.cout_euro || 0), 0),
-    });
+      const filteredSessions = sessions.filter(s => {
+        const d = s.date_session || s.date_debut; // model says date_session
+        if (!d) return false;
+        return d >= dateFrom && d <= (dateTo + "T23:59:59");
+      });
+
+      setStats({
+        nbConducteurs: collabs.length,
+        nbVehicules: vehicules.length,
+        sessionsDom: filteredSessions.filter(s => s.is_domicile).length,
+        sessionsHors: filteredSessions.filter(s => !s.is_domicile).length,
+        energieDom: filteredSessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0),
+        energieHors: filteredSessions.filter(s => !s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0),
+        coutTotal: filteredSessions.reduce((a, s) => a + (s.cout_euro || 0), 0),
+      });
+    } catch (err) {
+      console.error("Error loading stats:", err);
+    }
   }
 
   const energieTotal = stats.energieDom + stats.energieHors;

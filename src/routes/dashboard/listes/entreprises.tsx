@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { api, apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import CreateEntrepriseDialog from "@/components/CreateEntrepriseDialog";
 import { Plus, Search, Eye, Archive, Download } from "lucide-react";
@@ -27,18 +27,20 @@ function ListeEntreprises() {
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
 
-  const canAccess = role === "superadmin" || role === "admin";
+  const canAccess = role === "superadmin" || role === "gestionnaire_entreprise";
 
   useEffect(() => {
     if (loading || !canAccess) return;
     loadData();
   }, [loading, canAccess]);
+
   async function loadData() {
-    const { data } = await supabase
-      .from("entreprises")
-      .select("id, nom, siren, siret, ville, email, created_at")
-      .order("nom");
-    if (data) setEntreprises(data);
+    try {
+      const data = await api.entreprises.list();
+      setEntreprises(data);
+    } catch (err) {
+      console.error("Error loading entreprises:", err);
+    }
   }
 
   if (loading) {
@@ -52,7 +54,7 @@ function ListeEntreprises() {
   if (!canAccess) {
     return (
       <div className="p-4 sm:p-6 md:p-8">
-        <p className="text-muted-foreground">Accès réservé aux SuperAdmin et Admin.</p>
+        <p className="text-muted-foreground">Accès non autorisé.</p>
       </div>
     );
   }
@@ -75,9 +77,11 @@ function ListeEntreprises() {
           })))} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
             <Download className="h-4 w-4" /> Exporter
           </button>
-          <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
-            <Plus className="h-4 w-4" /> Ajouter une entreprise
-          </button>
+          {role === "superadmin" && (
+            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
+              <Plus className="h-4 w-4" /> Ajouter une entreprise
+            </button>
+          )}
         </div>
       </div>
 
@@ -112,9 +116,26 @@ function ListeEntreprises() {
                   <td className="px-6 py-4 text-card-foreground">{e.ville || "—"}</td>
                   <td className="px-6 py-4 text-card-foreground">{e.email || "—"}</td>
                   <td className="px-6 py-4 text-card-foreground">{new Date(e.created_at).toLocaleDateString("fr-FR")}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 flex items-center gap-2">
                     <button className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Voir">
                       <Eye className="h-4 w-4" />
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        if (confirm(`Voulez-vous vraiment supprimer l'entreprise ${e.nom} ?`)) {
+                          try {
+                            await apiFetch(`/api/entreprises/${e.id}`, { method: "DELETE" });
+                            loadData();
+                          } catch (err) {
+                            console.error("Delete error:", err);
+                            alert("Erreur lors de la suppression");
+                          }
+                        }
+                      }}
+                      className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" 
+                      title="Archiver"
+                    >
+                      <Archive className="h-4 w-4" />
                     </button>
                   </td>
                 </tr>

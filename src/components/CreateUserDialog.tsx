@@ -14,19 +14,13 @@ interface Props {
 
 const ROLE_LABELS: Record<AppRole, string> = {
   superadmin: "Superadmin",
-  admin: "Admin",
   gestionnaire_entreprise: "Gestionnaire entreprise",
-  gestionnaire_filiale: "Gestionnaire filiale",
-  gestionnaire_site: "Gestionnaire site",
   collaborateur: "Collaborateur",
 };
 
 const MANAGEABLE_ROLES: Record<AppRole, AppRole[]> = {
-  superadmin: ["admin"],
-  admin: ["gestionnaire_entreprise", "gestionnaire_filiale", "gestionnaire_site", "collaborateur"],
-  gestionnaire_entreprise: ["gestionnaire_filiale", "gestionnaire_site", "collaborateur"],
-  gestionnaire_filiale: ["gestionnaire_site", "collaborateur"],
-  gestionnaire_site: ["collaborateur"],
+  superadmin: ["gestionnaire_entreprise", "collaborateur"],
+  gestionnaire_entreprise: ["collaborateur"],
   collaborateur: [],
 };
 
@@ -131,19 +125,11 @@ export default function CreateUserDialog({ actorRole, profile, open, defaultRole
             </div>
           </div>
 
-          {showScopeFields && form.role !== "admin" && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border pt-4">
+          {actorRole === "superadmin" && (
+            <div className="grid grid-cols-1 gap-3 border-t border-border pt-4">
               <div>
                 <label className="text-sm font-medium text-foreground">Entreprise ID</label>
                 <input className={inputCls} value={form.entreprise_id} onChange={(e) => setForm((f) => ({ ...f, entreprise_id: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-foreground">Filiale ID</label>
-                <input className={inputCls} value={form.filiale_id} onChange={(e) => setForm((f) => ({ ...f, filiale_id: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-foreground">Site ID</label>
-                <input className={inputCls} value={form.site_id} onChange={(e) => setForm((f) => ({ ...f, site_id: e.target.value }))} />
               </div>
             </div>
           )}

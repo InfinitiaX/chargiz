@@ -11,8 +11,6 @@ interface Props {
 
 export default function CreateCollaborateurDialog({ entrepriseId, open, onClose, onCreated }: Props) {
   const [loading, setLoading] = useState(false);
-  const [filiales, setFiliales] = useState<{ id: string; nom: string }[]>([]);
-  const [sites, setSites] = useState<{ id: string; nom: string }[]>([]);
   const [vehiculesLibres, setVehiculesLibres] = useState<{ id: string; marque: string; modele: string; immatriculation: string; statut_smartcar: string }[]>([]);
   const [vehicleOption, setVehicleOption] = useState<"nouveau" | "existant">("nouveau");
   const [selectedVehiculeId, setSelectedVehiculeId] = useState("");
@@ -22,29 +20,22 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
     email: "",
     telephone: "",
     adresse: "",
-    code_postal: "",
     ville: "",
-    pays: "France",
-    filiale_id: "",
-    site_id: "",
   });
 
   useEffect(() => {
     if (open) {
-      apiFetch<{ id: string; nom: string }[]>(`/api/entreprises/${entrepriseId}/filiales`).then(setFiliales).catch(console.error);
       apiFetch<{ id: string; marque: string | null; modele: string | null; immatriculation: string | null; statut_smartcar: string | null }[]>(`/api/vehicules?entreprise_id=${entrepriseId}&statut_affectation=non_affecte`)
-        .then((data) => setVehiculesLibres(data.map(v => ({ id: v.id, marque: v.marque ?? '', modele: v.modele ?? '', immatriculation: v.immatriculation ?? '', statut_smartcar: v.statut_smartcar ?? '' }))))
+        .then((data) => setVehiculesLibres(data.map(v => ({ 
+          id: v.id, 
+          marque: v.marque ?? '', 
+          modele: v.modele ?? '', 
+          immatriculation: v.immatriculation ?? '', 
+          statut_smartcar: v.statut_smartcar ?? '' 
+        }))))
         .catch(console.error);
     }
   }, [open, entrepriseId]);
-
-  useEffect(() => {
-    if (form.filiale_id) {
-      apiFetch<{ id: string; nom: string }[]>(`/api/filiales/${form.filiale_id}/sites`).then(setSites).catch(console.error);
-    } else {
-      setSites([]);
-    }
-  }, [form.filiale_id]);
 
   if (!open) return null;
 
@@ -59,10 +50,9 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
           prenom: form.prenom,
           email: form.email,
           telephone: form.telephone || null,
+          adresse: form.adresse || null,
+          ville: form.ville || null,
           entreprise_id: entrepriseId,
-          filiale_id: form.filiale_id || null,
-          site_id: form.site_id || null,
-          role: "collaborateur",
           is_active: true,
         }),
       });
@@ -79,6 +69,7 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
 
       onCreated();
       onClose();
+      setForm({ nom: "", prenom: "", email: "", telephone: "", adresse: "", ville: "" });
     } catch (err) {
       console.error("Erreur création collaborateur:", err);
     } finally {
@@ -89,14 +80,14 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
   const inputCls = "w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-card-foreground">Ajouter un collaborateur</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium text-foreground">Nom *</label>
               <input required className={inputCls} value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} />
@@ -118,38 +109,11 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
             <label className="text-sm font-medium text-foreground">Adresse</label>
             <input className={inputCls} value={form.adresse} onChange={e => setForm(f => ({ ...f, adresse: e.target.value }))} placeholder="Adresse complète" />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-sm font-medium text-foreground">Code postal</label>
-              <input className={inputCls} value={form.code_postal} onChange={e => setForm(f => ({ ...f, code_postal: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">Ville</label>
-              <input className={inputCls} value={form.ville} onChange={e => setForm(f => ({ ...f, ville: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">Pays</label>
-              <input className={inputCls} value={form.pays} onChange={e => setForm(f => ({ ...f, pays: e.target.value }))} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium text-foreground">Filiale</label>
-              <select className={inputCls} value={form.filiale_id} onChange={e => setForm(f => ({ ...f, filiale_id: e.target.value, site_id: "" }))}>
-                <option value="">Sélectionner</option>
-                {filiales.map(f => <option key={f.id} value={f.id}>{f.nom}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">Site</label>
-              <select className={inputCls} value={form.site_id} onChange={e => setForm(f => ({ ...f, site_id: e.target.value }))}>
-                <option value="">Sélectionner</option>
-                {sites.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="text-sm font-medium text-foreground">Ville</label>
+            <input className={inputCls} value={form.ville} onChange={e => setForm(f => ({ ...f, ville: e.target.value }))} />
           </div>
 
-          {/* Vehicle Assignment */}
           <div className="border-t border-border pt-4">
             <p className="text-sm font-medium text-foreground mb-3">Affectation véhicule</p>
             <div className="flex gap-3 mb-3">
@@ -174,7 +138,7 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
                     <option value="">Sélectionner un véhicule</option>
                     {vehiculesLibres.map(v => (
                       <option key={v.id} value={v.id}>
-                        {v.marque} {v.modele} — {v.immatriculation} ({v.statut_smartcar === "connecte" ? "Connecté" : "Suspendu"})
+                        {v.marque} {v.modele} — {v.immatriculation}
                       </option>
                     ))}
                   </select>

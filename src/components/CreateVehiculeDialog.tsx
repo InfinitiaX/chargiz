@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Car, ShieldCheck, Zap } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 interface Props {
@@ -61,14 +61,22 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
   const inputCls = "w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-card-foreground">Ajouter un véhicule</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Car className="h-5 w-5" />
+            </div>
+            <h2 className="text-lg font-semibold text-card-foreground">Nouveau véhicule</h2>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
         </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium text-foreground">Marque *</label>
               <input required className={inputCls} value={form.marque} onChange={e => setForm(f => ({ ...f, marque: e.target.value }))} placeholder="Ex: Tesla" />
@@ -78,7 +86,8 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
               <input required className={inputCls} value={form.modele} onChange={e => setForm(f => ({ ...f, modele: e.target.value }))} placeholder="Ex: Model 3" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium text-foreground">Immatriculation</label>
               <input className={inputCls} value={form.immatriculation} onChange={e => setForm(f => ({ ...f, immatriculation: e.target.value }))} placeholder="AA-123-BB" />
@@ -88,21 +97,33 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
               <input className={inputCls} value={form.vin} onChange={e => setForm(f => ({ ...f, vin: e.target.value }))} placeholder="17 caractères" />
             </div>
           </div>
+
           <div>
-            <label className="text-sm font-medium text-foreground">Capacité batterie (kWh)</label>
+            <label className="text-sm font-medium text-foreground flex items-center gap-1">
+              <Zap className="h-3 w-3 text-yellow-500" /> Capacité batterie (kWh)
+            </label>
             <input type="number" step="0.1" className={inputCls} value={form.capacite_batterie} onChange={e => setForm(f => ({ ...f, capacite_batterie: e.target.value }))} placeholder="Ex: 60" />
           </div>
-          <div>
-            <label className="text-sm font-medium text-foreground">Affecter à un collaborateur</label>
+
+          <div className="border-t border-border pt-4">
+            <label className="text-sm font-medium text-foreground flex items-center gap-1 mb-2">
+              <ShieldCheck className="h-3 w-3 text-primary" /> Affectation
+            </label>
             <select className={inputCls} value={form.collaborateur_id} onChange={e => setForm(f => ({ ...f, collaborateur_id: e.target.value }))}>
-              <option value="">Non affecté</option>
+              <option value="">Laisser disponible (non affecté)</option>
               {collabs.map(c => <option key={c.id} value={c.id}>{c.prenom} {c.nom}</option>)}
             </select>
+            <p className="mt-2 text-xs text-muted-foreground italic">
+              Vous pourrez modifier l'affectation plus tard depuis la fiche véhicule.
+            </p>
           </div>
+
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">Annuler</button>
+            <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
+              Annuler
+            </button>
             <button type="submit" disabled={loading} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50">
-              {loading ? "Création..." : "Enregistrer"}
+              {loading ? "Création..." : "Ajouter au parc"}
             </button>
           </div>
         </form>

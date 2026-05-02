@@ -1,14 +1,9 @@
-// Front-only mock auth: a superadmin is always "logged in" so the maquette
-// is fully navigable without backend. Switch DEMO_ROLE below to test other
-// role-based dashboards.
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { API_URL, TOKEN_STORAGE_KEY, apiFetch } from "@/lib/api";
 
 export type AppRole =
   | "superadmin"
-  | "admin"
   | "gestionnaire_entreprise"
-  | "gestionnaire_filiale"
-  | "gestionnaire_site"
   | "collaborateur";
 
 export interface Profile {
@@ -32,69 +27,211 @@ export interface Profile {
   is_active: boolean;
 }
 
-const DEMO_ROLE: AppRole = "superadmin";
+interface AuthUser {
+  id: string;
+  email: string;
+  username: string;
+  full_name: string | null;
+  role: AppRole;
+  entreprise_id: string | null;
+  filiale_id: string | null;
+  site_id: string | null;
+  is_active: boolean;
+}
 
-const DEMO_USER = {
-  id: "user-superadmin",
-  email: "demo@chargiz.fr",
-  username: "superadmin",
-  full_name: "Marie Démo",
-  role: DEMO_ROLE,
-  entreprise_id: "ent-1",
-  filiale_id: "fil-1",
-  site_id: "site-1",
-  is_active: true,
-};
+interface AuthSession {
+  access_token: string;
+  token_type: string;
+}
 
-const DEMO_SESSION = { access_token: "demo-token", token_type: "bearer" };
+const cache: {
+  user?: AuthUser | null;
+  session?: AuthSession | null;
+  role?: AppRole | null;
+  profile?: Profile | null;
+} = {};
 
-const DEMO_PROFILE: Profile = {
-  id: DEMO_USER.id,
-  user_id: DEMO_USER.id,
-  nom: "Démo",
-  prenom: "Marie",
-  email: DEMO_USER.email,
-  telephone: "0600000000",
-  adresse: "12 rue de la Paix",
-  code_postal: "75008",
-  ville: "Paris",
-  pays: "France",
-  entreprise_id: DEMO_USER.entreprise_id,
-  filiale_id: DEMO_USER.filiale_id,
-  site_id: DEMO_USER.site_id,
-  cout_kwh_domicile: 0.2516,
-  jours_suivi: ["lundi", "mardi", "mercredi", "jeudi", "vendredi"],
-  horaires_suivi: { debut: "08:30", fin: "18:00" },
-  jours_conge: [],
-  is_active: true,
-};
+function splitFullName(fullName: string | null) {
+  const value = (fullName || "").trim();
+  if (!value) {
+    return { prenom: "Utilisateur", nom: "" };
+  }
+  const parts = value.split(/\s+/);
+  return {
+    prenom: parts[0] || "Utilisateur",
+    nom: parts.slice(1).join(" "),
+  };
+}
+
+function buildProfile(user: AuthUser): Profile {
+  const { prenom, nom } = splitFullName(user.full_name);
+  return {
+    id: user.id,
+    user_id: user.id,
+    nom,
+    prenom,
+    email: user.email,
+    telephone: null,
+    adresse: null,
+    code_postal: null,
+    ville: null,
+    pays: "France",
+    entreprise_id: user.entreprise_id,
+    filiale_id: user.filiale_id,
+    site_id: user.site_id,
+    cout_kwh_domicile: null,
+    jours_suivi: [],
+    horaires_suivi: {},
+    jours_conge: [],
+    is_active: user.is_active,
+  };
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  try {
+    const payload = await response.json();
+    return payload.detail || payload.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function useAuth() {
-  const [user] = useState(DEMO_USER);
-  const [session] = useState(DEMO_SESSION);
-  const [role] = useState<AppRole>(DEMO_ROLE);
-  const [profile] = useState<Profile>(DEMO_PROFILE);
+  const [user, setUser] = useState<AuthUser | null>(cache.user ?? null);
+  const [session, setSession] = useState<AuthSession | null>(cache.session ?? null);
+  const [role, setRole] = useState<AppRole | null>(cache.role ?? null);
+  const [profile, setProfile] = useState<Profile | null>(cache.profile ?? null);
+  const [loading, setLoading] = useState(!cache.user);
 
-  const signIn = async (_id: string, _pwd: string) => { /* no-op in demo */ };
-  const signOut = async () => { /* no-op in demo */ };
-  const resetPassword = async (_email: string) => { /* no-op */ };
-  const updatePassword = async (_old: string, _next: string) => { /* no-op */ };
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token || !API_URL) {
+      setLoading(false);
+      return;
+    }
 
-  const canManage = (target: AppRole): boolean => {
-    const map: Record<AppRole, AppRole[]> = {
-      superadmin: ["admin", "gestionnaire_entreprise", "gestionnaire_filiale", "gestionnaire_site", "collaborateur"],
-      admin: ["gestionnaire_entreprise", "gestionnaire_filiale", "gestionnaire_site", "collaborateur"],
-      gestionnaire_entreprise: ["gestionnaire_filiale", "gestionnaire_site", "collaborateur"],
-      gestionnaire_filiale: ["gestionnaire_site", "collaborateur"],
-      gestionnaire_site: ["collaborateur"],
-      collaborateur: [],
-    };
-    return map[role]?.includes(target) ?? false;
+    apiFetch<AuthUser>("/auth/me", {}, token)
+      .then((currentUser) => {
+        const nextSession: AuthSession = {
+          access_token: token,
+          token_type: "bearer",
+        };
+        const nextProfile = buildProfile(currentUser);
+        cache.user = currentUser;
+        cache.session = nextSession;
+        cache.role = currentUser.role;
+        cache.profile = nextProfile;
+        setUser(currentUser);
+        setSession(nextSession);
+        setRole(currentUser.role);
+        setProfile(nextProfile);
+      })
+      .catch(() => {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        cache.user = null;
+        cache.session = null;
+        cache.role = null;
+        cache.profile = null;
+        setUser(null);
+        setSession(null);
+        setRole(null);
+        setProfile(null);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const signIn = async (identifier: string, password: string) => {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        username: identifier,
+        password,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, "Erreur de connexion"));
+    }
+
+    const authSession = (await response.json()) as AuthSession;
+    localStorage.setItem(TOKEN_STORAGE_KEY, authSession.access_token);
+
+    const currentUser = await apiFetch<AuthUser>("/auth/me", {}, authSession.access_token);
+    const nextProfile = buildProfile(currentUser);
+
+    cache.user = currentUser;
+    cache.session = authSession;
+    cache.role = currentUser.role;
+    cache.profile = nextProfile;
+
+    setUser(currentUser);
+    setSession(authSession);
+    setRole(currentUser.role);
+    setProfile(nextProfile);
   };
 
-  const isAtLeast = (min: AppRole): boolean => {
-    const order: AppRole[] = ["superadmin", "admin", "gestionnaire_entreprise", "gestionnaire_filiale", "gestionnaire_site", "collaborateur"];
-    return order.indexOf(role) <= order.indexOf(min);
+  const signOut = async () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    cache.user = null;
+    cache.session = null;
+    cache.role = null;
+    cache.profile = null;
+    setUser(null);
+    setSession(null);
+    setRole(null);
+    setProfile(null);
+    window.location.href = "/";
+  };
+
+  const resetPassword = async (_email: string) => {
+    throw new Error("La réinitialisation du mot de passe n'est pas encore branchée sur le nouveau backend.");
+  };
+
+  const updatePassword = async (oldPassword: string, newPassword: string) => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) throw new Error("Non authentifié");
+
+    const response = await fetch(`${API_URL}/auth/change-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        old_password: oldPassword,
+        new_password: newPassword,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, "Erreur lors du changement de mot de passe"));
+    }
+  };
+
+  const canManage = (targetRole: AppRole): boolean => {
+    if (!role) return false;
+    const manageableRoles: Record<AppRole, AppRole[]> = {
+      superadmin: ["gestionnaire_entreprise", "collaborateur"],
+      gestionnaire_entreprise: ["collaborateur"],
+      collaborateur: [],
+    };
+    return manageableRoles[role]?.includes(targetRole) ?? false;
+  };
+
+  const isAtLeast = (minRole: AppRole): boolean => {
+    if (!role) return false;
+    const hierarchy: AppRole[] = [
+      "superadmin",
+      "gestionnaire_entreprise",
+      "collaborateur",
+    ];
+    const roleIndex = hierarchy.indexOf(role);
+    const minRoleIndex = hierarchy.indexOf(minRole);
+    if (roleIndex === -1 || minRoleIndex === -1) return false;
+    return roleIndex <= minRoleIndex;
   };
 
   return {
@@ -102,7 +239,7 @@ export function useAuth() {
     session,
     role,
     profile,
-    loading: false,
+    loading,
     signIn,
     signOut,
     resetPassword,

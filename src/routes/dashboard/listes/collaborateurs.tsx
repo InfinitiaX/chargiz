@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Archive, Download, Eye, Plus, Search } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Archive, Download, Eye, Plus, Search, Upload, Trash2 } from "lucide-react";
 import CreateCollaborateurDialog from "@/components/CreateCollaborateurDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { apiFetch } from "@/lib/api";
@@ -8,7 +8,7 @@ import { exportCSV } from "@/lib/export";
 
 export const Route = createFileRoute("/dashboard/listes/collaborateurs")({
   component: ListeCollaborateurs,
-  head: () => ({ meta: [{ title: "ChargiZ - Collaborateurs" }] }),
+  head: () => ({ meta: [{ title: "ChargiZ — Collaborateurs" }] }),
 });
 
 interface Collab {
@@ -16,6 +16,7 @@ interface Collab {
   nom: string;
   prenom: string;
   email: string;
+  telephone: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -26,6 +27,8 @@ function ListeCollaborateurs() {
   const [collaborateurs, setCollaborateurs] = useState<Collab[]>([]);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -39,12 +42,58 @@ function ListeCollaborateurs() {
   }
 
   const handleArchive = async (id: string) => {
-    if (!confirm("Voulez-vous archiver ce collaborateur ?")) return;
-    await apiFetch(`/api/collaborateurs/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ is_active: false }),
-    });
-    loadData();
+    if (!confirm("Voulez-vous archiver ce collaborateur ? Ses accès seront suspendus.")) return;
+    try {
+      await apiFetch(`/api/collaborateurs/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: false }),
+      });
+      loadData();
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'archivage");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Voulez-vous SUPPRIMER définitivement ce collaborateur ? Cette action est irréversible.")) return;
+    try {
+      await apiFetch(`/api/collaborateurs/${id}`, { method: "DELETE" });
+      loadData();
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la suppression");
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      try {
+        await apiFetch("/api/collaborateurs/import/csv", {
+          method: "POST",
+          body: JSON.stringify({ file_content: text }),
+        });
+        alert("Importation réussie !");
+        loadData();
+      } catch (err) {
+        console.error(err);
+        alert("Erreur lors de l'importation. Vérifiez le format du CSV (Nom, Prénom, Email, Téléphone).");
+      } finally {
+        setImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsText(file);
   };
 
   const filtered = collaborateurs.filter((collab) =>
@@ -64,13 +113,18 @@ function ListeCollaborateurs() {
       <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Collaborateurs</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Liste complete des collaborateurs</p>
+          <p className="mt-1 text-sm text-muted-foreground">Gérez vos équipes et leurs accès</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+          <button onClick={handleImportClick} disabled={importing} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
+            <Upload className="h-4 w-4" /> {importing ? "Import..." : "Importer CSV"}
+          </button>
           <button onClick={() => exportCSV("collaborateurs", filtered.map((collab) => ({
             Nom: collab.nom,
             Prenom: collab.prenom,
             Email: collab.email,
+            Telephone: collab.telephone || "",
             Etat: collab.is_active ? "Actif" : "Archive",
             "Date creation": new Date(collab.created_at).toLocaleDateString("fr-FR"),
           })))} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
@@ -89,7 +143,7 @@ function ListeCollaborateurs() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Rechercher..."
+            placeholder="Rechercher par nom, email..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
@@ -102,36 +156,43 @@ function ListeCollaborateurs() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Nom</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Prenom</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Collaborateur</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Email</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Date de creation</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Etat</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Actions</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Téléphone</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">État</th>
+                <th className="px-6 py-3 text-right font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Aucun collaborateur</td></tr>
+                <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Aucun collaborateur trouvé</td></tr>
               ) : filtered.map((collab) => (
-                <tr key={collab.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4 font-medium text-card-foreground">{collab.nom}</td>
-                  <td className="px-6 py-4 text-card-foreground">{collab.prenom}</td>
+                <tr key={collab.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-card-foreground">{collab.prenom} {collab.nom}</span>
+                      <span className="text-xs text-muted-foreground">Inscrit le {new Date(collab.created_at).toLocaleDateString("fr-FR")}</span>
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-card-foreground">{collab.email}</td>
-                  <td className="px-6 py-4 text-card-foreground">{new Date(collab.created_at).toLocaleDateString("fr-FR")}</td>
+                  <td className="px-6 py-4 text-card-foreground">{collab.telephone || "—"}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${collab.is_active ? "bg-chargiz-teal/10 text-chargiz-teal" : "bg-destructive/10 text-destructive"}`}>
-                      {collab.is_active ? "Actif" : "Archive"}
+                      {collab.is_active ? "Actif" : "Archivé"}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
                       <Link to="/dashboard/collaborateur/$id" params={{ id: collab.id }} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Voir fiche">
                         <Eye className="h-4 w-4" />
                       </Link>
-                      {collab.is_active && (
+                      {collab.is_active ? (
                         <button onClick={() => handleArchive(collab.id)} title="Archiver" className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
                           <Archive className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <button onClick={() => handleDelete(collab.id)} title="Supprimer définitivement" className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/20 hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       )}
                     </div>

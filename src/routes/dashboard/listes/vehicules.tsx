@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import CreateVehiculeDialog from "@/components/CreateVehiculeDialog";
 import { Plus, Search, Car, Eye, Edit, Trash2, X, Download } from "lucide-react";
 import { exportCSV } from "@/lib/export";
+import { apiFetch } from "@/lib/api";
 
 export const Route = createFileRoute("/dashboard/listes/vehicules")({
   component: ListeVehicules,
@@ -39,27 +39,44 @@ function ListeVehicules() {
   }, [loading, entrepriseId]);
 
   async function loadVehicules() {
-    const { data } = await supabase.from("vehicules").select("*").eq("entreprise_id", entrepriseId);
-    if (data) setVehicules(data as Vehicule[]);
+    try {
+      const data = await apiFetch<Vehicule[]>(`/api/vehicules?entreprise_id=${entrepriseId}`);
+      setVehicules(data);
+    } catch (err) {
+      console.error("Error loading vehicles:", err);
+    }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm("Voulez-vous supprimer ce véhicule ?")) return;
-    await supabase.from("vehicules").delete().eq("id", id);
-    loadVehicules();
+    try {
+      await apiFetch(`/api/vehicules/${id}`, { method: "DELETE" });
+      loadVehicules();
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la suppression");
+    }
   };
 
   const handleEditSave = async () => {
     if (!editVeh) return;
-    await supabase.from("vehicules").update({
-      marque: editVeh.marque,
-      modele: editVeh.modele,
-      immatriculation: editVeh.immatriculation,
-      vin: editVeh.vin,
-      capacite_batterie: editVeh.capacite_batterie,
-    }).eq("id", editVeh.id);
-    setEditVeh(null);
-    loadVehicules();
+    try {
+      await apiFetch(`/api/vehicules/${editVeh.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          marque: editVeh.marque,
+          modele: editVeh.modele,
+          immatriculation: editVeh.immatriculation,
+          vin: editVeh.vin,
+          capacite_batterie: editVeh.capacite_batterie,
+        }),
+      });
+      setEditVeh(null);
+      loadVehicules();
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la modification");
+    }
   };
 
   const filtered = vehicules.filter(v => {
@@ -102,26 +119,28 @@ function ListeVehicules() {
         </div>
       </div>
 
-      <div className="mb-6 flex items-center gap-3">
-        <div className="relative flex-1 max-w-md">
+      <div className="mb-6 flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative flex-1 w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input type="text" placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="Rechercher par marque, immatriculation..." value={search} onChange={e => setSearch(e.target.value)}
             className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
         </div>
-        <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)}
-          className="rounded-lg border border-input bg-card px-3 py-2.5 text-sm outline-none focus:border-primary">
-          <option value="">Tous statuts</option>
-          <option value="affecte">Affecté</option>
-          <option value="non_affecte">Non affecté</option>
-          <option value="archive">Archivé</option>
-        </select>
-        <select value={filterAbo} onChange={e => setFilterAbo(e.target.value)}
-          className="rounded-lg border border-input bg-card px-3 py-2.5 text-sm outline-none focus:border-primary">
-          <option value="">Toutes connexions</option>
-          <option value="connecte">Connecté</option>
-          <option value="suspendu">Suspendu</option>
-          <option value="deconnecte">Déconnecté</option>
-        </select>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)}
+            className="flex-1 sm:flex-none rounded-lg border border-input bg-card px-3 py-2.5 text-sm outline-none focus:border-primary">
+            <option value="">Tous statuts</option>
+            <option value="affecte">Affecté</option>
+            <option value="non_affecte">Non affecté</option>
+            <option value="archive">Archivé</option>
+          </select>
+          <select value={filterAbo} onChange={e => setFilterAbo(e.target.value)}
+            className="flex-1 sm:flex-none rounded-lg border border-input bg-card px-3 py-2.5 text-sm outline-none focus:border-primary">
+            <option value="">Toutes connexions</option>
+            <option value="connecte">Connecté</option>
+            <option value="suspendu">Suspendu</option>
+            <option value="deconnecte">Déconnecté</option>
+          </select>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -129,24 +148,25 @@ function ListeVehicules() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Marque</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Modèle</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">VIN</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Véhicule</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Immat</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Batterie</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Statut</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Abonnement</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Actions</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Smartcar</th>
+                <th className="px-6 py-3 text-right font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-8 text-center text-muted-foreground">Aucun véhicule</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">Aucun véhicule trouvé</td></tr>
               ) : filtered.map(v => (
-                <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4 font-medium text-card-foreground">{v.marque || "—"}</td>
-                  <td className="px-6 py-4 text-card-foreground">{v.modele || "—"}</td>
-                  <td className="px-6 py-4 font-mono text-xs text-card-foreground">{v.vin || "—"}</td>
+                <tr key={v.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-card-foreground">{v.marque || "—"} {v.modele || ""}</span>
+                      <span className="text-xs text-muted-foreground font-mono">{v.vin || "VIN non renseigné"}</span>
+                    </div>
+                  </td>
                   <td className="px-6 py-4 font-mono text-xs text-card-foreground">{v.immatriculation || "—"}</td>
                   <td className="px-6 py-4 text-card-foreground">{v.capacite_batterie ? `${v.capacite_batterie} kWh` : "—"}</td>
                   <td className="px-6 py-4">
@@ -164,8 +184,8 @@ function ListeVehicules() {
                       {v.statut_smartcar === "connecte" ? "Connecté" : v.statut_smartcar === "suspendu" ? "Suspendu" : "Déconnecté"}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
                       <Link to="/dashboard/listes/vehicules/$vehiculeId" params={{ vehiculeId: v.id }}
                         className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Fiche">
                         <Eye className="h-4 w-4" />
@@ -185,9 +205,9 @@ function ListeVehicules() {
 
       {/* Edit Dialog */}
       {editVeh && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl border border-border">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-card-foreground">Modifier le véhicule</h2>
               <button onClick={() => setEditVeh(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>

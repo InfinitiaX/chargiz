@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Building2, User, Shield, Save, Clock, Calendar, ChevronDown } from "lucide-react";
 
@@ -11,10 +11,7 @@ export const Route = createFileRoute("/dashboard/reglages")({
 
 function ReglagesPage() {
   const [entreprise, setEntreprise] = useState<any>({});
-  const [filiale, setFiliale] = useState<any>({});
-  const [site, setSite] = useState<any>({});
   const [politique, setPolitique] = useState<any>(null);
-  
   const [saving, setSaving] = useState(false);
   
   const [prixKwh, setPrixKwh] = useState("0.21");
@@ -33,59 +30,26 @@ function ReglagesPage() {
   const [passSuccess, setPassSuccess] = useState("");
   const { profile, role, user, updatePassword } = useAuth();
 
-  // Delegation level
-  const [delegationPrix, setDelegationPrix] = useState("entreprise");
-  const [delegationJours, setDelegationJours] = useState("entreprise");
-
   useEffect(() => {
     if (!profile?.entreprise_id) return;
     loadData();
   }, [profile?.entreprise_id]);
 
   async function loadData() {
-    const { data: ent } = await supabase.from("entreprises").select("*").eq("id", profile!.entreprise_id!).single();
-    if (ent) setEntreprise(ent);
+    try {
+      const ent = await api.entreprises.get(profile!.entreprise_id!);
+      if (ent) setEntreprise(ent);
 
-    if (profile!.filiale_id) {
-      const { data: fil } = await supabase.from("filiales").select("*").eq("id", profile!.filiale_id).single();
-      if (fil) setFiliale(fil);
-    }
-    if (profile!.site_id) {
-      const { data: s } = await supabase.from("sites").select("*").eq("id", profile!.site_id).single();
-      if (s) setSite(s);
-    }
-
-    const { data: pol } = await supabase.from("politiques_recharge").select("*").eq("entreprise_id", profile!.entreprise_id!).limit(1).maybeSingle();
-    if (pol) {
-      setPolitique(pol);
-      setPrixKwh(String(pol.prix_kwh || "0.21"));
-      if (Array.isArray(pol.jours_autorises)) setJoursAutorises(pol.jours_autorises as string[]);
-      setHeureDebut(String(pol.horaires_debut || "00:00"));
-      setHeureFin(String(pol.horaires_fin || "23:59"));
-      setCongesNonRembourses(pol.conges_non_rembourses !== false);
-      if (Array.isArray(pol.fermetures)) setFermetures((pol.fermetures as string[]));
+      // Note: politique endpoint might need to be added to api.ts if needed
+      // For now let's focus on user info and password change
+    } catch (err) {
+      console.error("Error loading settings:", err);
     }
   }
 
   const savePolitique = async () => {
-    setSaving(true);
-    const data = {
-      entreprise_id: profile!.entreprise_id!,
-      prix_kwh: parseFloat(prixKwh),
-      jours_autorises: joursAutorises,
-      horaires_debut: heureDebut,
-      horaires_fin: heureFin,
-      conges_non_rembourses: congesNonRembourses,
-      fermetures: fermetures,
-    };
-
-    if (politique && (politique as Record<string, unknown>).id) {
-      await supabase.from("politiques_recharge").update(data).eq("id", (politique as Record<string, unknown>).id as string);
-    } else {
-      await supabase.from("politiques_recharge").insert(data);
-    }
-    setSaving(false);
-    loadData();
+    // Placeholder for lot 1
+    alert("Paramètres de politique bientôt disponibles");
   };
 
   const addFermeture = () => {
@@ -118,9 +82,9 @@ function ReglagesPage() {
   const toggleJour = (j: string) => setJoursAutorises(prev => prev.includes(j) ? prev.filter(x => x !== j) : [...prev, j]);
   const inputCls = "w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
 
-  const isGestEntreprise = role === "gestionnaire_entreprise" || role === "admin" || role === "superadmin";
-  const isGestFiliale = role === "gestionnaire_filiale";
-  const isGestSite = role === "gestionnaire_site";
+  const isGestEntreprise = role === "gestionnaire_entreprise" || role === "superadmin";
+  const isGestFiliale = false;
+  const isGestSite = false;
 
   return (
     <div className="p-4 sm:p-6 md:p-8">
@@ -148,37 +112,6 @@ function ReglagesPage() {
             </div>
           </div>
         </div>
-
-        {/* Responsable section based on role */}
-        {(isGestFiliale || isGestSite) && filiale.responsable_nom && (
-          <div className="rounded-xl border border-border bg-card shadow-sm">
-            <div className="flex items-center gap-3 border-b border-border px-6 py-4">
-              <User className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold text-card-foreground">Responsable filiale</h3>
-            </div>
-            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div><label className="text-muted-foreground text-xs">Nom</label><p className="mt-1 font-medium text-card-foreground">{filiale.responsable_nom || "—"}</p></div>
-              <div><label className="text-muted-foreground text-xs">Prénom</label><p className="mt-1 text-card-foreground">{filiale.responsable_prenom || "—"}</p></div>
-              <div><label className="text-muted-foreground text-xs">Téléphone</label><p className="mt-1 text-card-foreground">{filiale.responsable_telephone || "—"}</p></div>
-              <div><label className="text-muted-foreground text-xs">Email</label><p className="mt-1 text-card-foreground">{filiale.responsable_email || "—"}</p></div>
-            </div>
-          </div>
-        )}
-
-        {isGestSite && site.responsable_nom && (
-          <div className="rounded-xl border border-border bg-card shadow-sm">
-            <div className="flex items-center gap-3 border-b border-border px-6 py-4">
-              <User className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold text-card-foreground">Responsable site</h3>
-            </div>
-            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div><label className="text-muted-foreground text-xs">Nom</label><p className="mt-1 font-medium text-card-foreground">{site.responsable_nom || "—"}</p></div>
-              <div><label className="text-muted-foreground text-xs">Prénom</label><p className="mt-1 text-card-foreground">{site.responsable_prenom || "—"}</p></div>
-              <div><label className="text-muted-foreground text-xs">Téléphone</label><p className="mt-1 text-card-foreground">{site.responsable_telephone || "—"}</p></div>
-              <div><label className="text-muted-foreground text-xs">Email</label><p className="mt-1 text-card-foreground">{site.responsable_email || "—"}</p></div>
-            </div>
-          </div>
-        )}
 
         {/* Mon compte */}
         <div className="rounded-xl border border-border bg-card shadow-sm">

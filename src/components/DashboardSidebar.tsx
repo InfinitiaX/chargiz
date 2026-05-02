@@ -53,10 +53,10 @@ export default function DashboardSidebar() {
 
   const getListesItems = (): NavItem[] => {
     const items: NavItem[] = [];
+    // For Lot 1, we only have Entreprises (for superadmin), Vehicules and Collaborateurs
     if (role === "superadmin") {
       items.push({ to: "/dashboard/listes/entreprises", icon: Building2, label: "Entreprises" });
     }
-    // Every manager/admin sees these within their scope
     items.push({ to: "/dashboard/listes/vehicules", icon: Car, label: "Véhicules" });
     items.push({ to: "/dashboard/listes/collaborateurs", icon: Users, label: "Collaborateurs" });
     return items;
