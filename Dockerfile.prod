@@ -1,10 +1,11 @@
 # Build stage — pure SPA build (Vite + TanStack Router)
-FROM node:20-alpine as build-stage
+FROM node:20-alpine AS build-stage
 
 WORKDIR /app
 
 COPY package.json package-lock.json* bun.lockb* ./
-RUN npm install
+# Install ALL deps (including devDependencies) so vite/tsc are available
+RUN npm install --include=dev
 
 COPY . .
 
