@@ -5,9 +5,12 @@ WORKDIR /app
 
 COPY package.json package-lock.json* bun.lockb* ./
 
-# Force development mode so npm installs devDependencies (vite, typescript, etc.)
+# Install ALL deps — force dev mode so vite/typescript are included
 ENV NODE_ENV=development
 RUN npm install
+
+# Install vite globally as a guaranteed fallback
+RUN npm install -g vite
 
 COPY . .
 
@@ -15,7 +18,8 @@ COPY . .
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-RUN npm run build
+# Use the global vite binary directly
+RUN vite build
 
 # Production stage — Nginx serving static dist/
 FROM nginx:alpine
