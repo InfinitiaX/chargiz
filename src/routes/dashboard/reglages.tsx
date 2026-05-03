@@ -40,16 +40,35 @@ function ReglagesPage() {
       const ent = await api.entreprises.get(profile!.entreprise_id!);
       if (ent) setEntreprise(ent);
 
-      // Note: politique endpoint might need to be added to api.ts if needed
-      // For now let's focus on user info and password change
+      const pols = await api.politiques.list({ entreprise_id: profile!.entreprise_id! });
+      if (pols.length > 0) {
+        setPolitique(pols[0]);
+        if (pols[0].prix_kwh !== null) setPrixKwh(pols[0].prix_kwh.toString());
+      }
     } catch (err) {
       console.error("Error loading settings:", err);
     }
   }
 
   const savePolitique = async () => {
-    // Placeholder for lot 1
-    alert("Paramètres de politique bientôt disponibles");
+    if (!profile?.entreprise_id) return;
+    setSaving(true);
+    try {
+      await api.politiques.save({
+        entreprise_id: profile.entreprise_id,
+        prix_kwh: parseFloat(prixKwh) || 0.25,
+        devise: "EUR",
+        jours_fermeture: fermetures.length, // Simplified for now
+        delegation_prix: "entreprise",
+        delegation_jours: "entreprise"
+      });
+      alert("Politique de recharge mise à jour avec succès !");
+    } catch (err) {
+      console.error("Erreur save politique:", err);
+      alert("Erreur lors de la sauvegarde.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const addFermeture = () => {

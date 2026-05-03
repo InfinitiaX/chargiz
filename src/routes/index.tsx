@@ -43,8 +43,23 @@ function LoginPage() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("La réinitialisation du mot de passe n'est pas encore branchée sur le nouveau backend.");
-    setForgotSent(false);
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("https://api.plateforme-test-infinitiax.com/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!response.ok) {
+        throw new Error("Erreur lors de l'envoi de l'email");
+      }
+      setForgotSent(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

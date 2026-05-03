@@ -132,5 +132,12 @@ export const api = {
   },
   stats: {
     get: (entrepriseId: string) => apiFetch<any>(`/api/entreprises/${entrepriseId}/stats`),
+  },
+  politiques: {
+    list: (params?: Record<string, string>) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiFetch<any[]>(`/api/politiques${qs ? `?${qs}` : ""}`);
+    },
+    save: (data: any) => apiFetch<any>(`/api/politiques`, { method: "POST", body: JSON.stringify(data) }),
   }
 };

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { ArrowLeft, User, Car, Mail, Phone, MapPin, Calendar, Database } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { ArrowLeft, User, Car, Mail, Phone, MapPin, Calendar, Database, Filter } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 export const Route = createFileRoute("/dashboard/collaborateur/$id")({
@@ -42,6 +42,9 @@ function CollaborateurDetails() {
   const [vehicule, setVehicule] = useState<Vehicule | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Date filter state (YYYY-MM)
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
   useEffect(() => {
     loadData();
@@ -65,6 +68,26 @@ function CollaborateurDetails() {
     }
   }
 
+  // Filter sessions
+  const filteredSessions = useMemo(() => {
+    if (selectedMonth === "all") return sessions;
+    return sessions.filter(s => {
+      const date = new Date(s.date_session);
+      const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      return monthStr === selectedMonth;
+    });
+  }, [sessions, selectedMonth]);
+
+  // Extract available months for filter
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>();
+    sessions.forEach(s => {
+      const date = new Date(s.date_session);
+      months.add(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+    });
+    return Array.from(months).sort().reverse(); // newest first
+  }, [sessions]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-16">
@@ -75,9 +98,13 @@ function CollaborateurDetails() {
 
   if (!collab) return <div className="p-8 text-center text-muted-foreground">Collaborateur non trouvé.</div>;
 
+  // Compute totals for current filter
+  const totalKwh = filteredSessions.reduce((acc, s) => acc + s.energie_kwh, 0);
+  const totalCout = filteredSessions.reduce((acc, s) => acc + s.cout_euro, 0);
+
   return (
-    <div className="p-4 sm:p-6 md:p-8">
-      <div className="mb-6">
+    <div className="p-4 sm:p-6 md:p-8 print:p-0 print:m-0">
+      <div className="mb-6 print:hidden">
         <Link to="/dashboard/listes/collaborateurs" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Retour à la liste
         </Link>
@@ -92,6 +119,12 @@ function CollaborateurDetails() {
             <h1 className="text-2xl font-bold text-foreground">{collab.prenom} {collab.nom}</h1>
             <p className="text-sm text-muted-foreground">{collab.is_active ? "Compte Actif" : "Compte Archivé"}</p>
           </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:brightness-95 print:hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            Télécharger PDF
+          </button>
         </div>
       </div>
 
@@ -152,6 +185,17 @@ function CollaborateurDetails() {
               <p className="text-sm text-muted-foreground italic">Aucun véhicule affecté.</p>
             )}
           </div>
+          
+          {/* Summary Card for Print */}
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm hidden print:block">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">Récapitulatif Période</h3>
+            <div className="space-y-2">
+              <p className="text-sm"><span className="text-muted-foreground">Période :</span> {selectedMonth === 'all' ? 'Toutes' : selectedMonth}</p>
+              <p className="text-sm"><span className="text-muted-foreground">Nombre de recharges :</span> {filteredSessions.length}</p>
+              <p className="text-sm"><span className="text-muted-foreground">Énergie totale :</span> {totalKwh.toFixed(2)} kWh</p>
+              <p className="text-sm font-bold mt-2"><span className="text-muted-foreground font-normal">Montant total remboursable :</span> {totalCout.toFixed(2)} €</p>
+            </div>
+          </div>
         </div>
 
         {/* Sessions Card */}
@@ -160,7 +204,20 @@ function CollaborateurDetails() {
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div className="flex items-center gap-2">
                 <Database className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-semibold text-card-foreground">Dernières sessions</h3>
+                <h3 className="text-lg font-semibold text-card-foreground">Sessions de recharge</h3>
+              </div>
+              <div className="flex items-center gap-2 print:hidden">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <select 
+                  value={selectedMonth} 
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-sm outline-none focus:border-primary"
+                >
+                  <option value="all">Toutes les périodes</option>
+                  {availableMonths.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -174,9 +231,9 @@ function CollaborateurDetails() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {sessions.length === 0 ? (
+                  {filteredSessions.length === 0 ? (
                     <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">Aucune session enregistrée</td></tr>
-                  ) : sessions.map(s => (
+                  ) : filteredSessions.map(s => (
                     <tr key={s.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-6 py-4 text-card-foreground">{new Date(s.date_session).toLocaleDateString("fr-FR")}</td>
                       <td className="px-6 py-4">
@@ -188,6 +245,15 @@ function CollaborateurDetails() {
                       <td className="px-6 py-4 text-right text-card-foreground font-medium">{s.cout_euro.toFixed(2)} €</td>
                     </tr>
                   ))}
+                  
+                  {/* Totals row */}
+                  {filteredSessions.length > 0 && (
+                    <tr className="bg-muted/10 font-bold border-t-2 border-border">
+                      <td colSpan={2} className="px-6 py-4 text-right">Total :</td>
+                      <td className="px-6 py-4 text-right">{totalKwh.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right text-primary">{totalCout.toFixed(2)} €</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

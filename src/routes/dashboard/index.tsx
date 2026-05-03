@@ -145,8 +145,14 @@ function SuperAdminDashboard() {
 function GestEntrepriseDashboard() {
   const { profile } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
-  const [stats, setStats] = useState({ collaborateurs: 0, vehicules: 0, energieTotal: 0, co2Evite: 0, coutRemboursable: 0 });
+  const [stats, setStats] = useState({
+    collaborateurs: 0, vehicules: 0,
+    energieTotal: 0, coutRemboursable: 0,
+    nbSessions: 0, nbSessionsDomicile: 0, energieDomicile: 0
+  });
   const [collabs, setCollabs] = useState<any[]>([]);
+  const [vehicules, setVehicules] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [showAddCollab, setShowAddCollab] = useState(false);
 
@@ -154,28 +160,30 @@ function GestEntrepriseDashboard() {
 
   async function loadData() {
     try {
-      const [collData, vehData] = await Promise.all([
+      const [collData, vehData, sessData] = await Promise.all([
         api.collaborateurs.list({ entreprise_id: entrepriseId }),
         api.vehicules.list({ entreprise_id: entrepriseId }),
+        api.sessions.list({ entreprise_id: entrepriseId }),
       ]);
       
       setCollabs(collData);
+      setVehicules(vehData);
+      setSessions(sessData);
       
       const statsData = await api.stats.get(entrepriseId).catch(() => null);
       if (statsData) {
+        const energieDomicile = sessData.filter(s => s.is_domicile).reduce((acc, s) => acc + (s.energie_kwh || 0), 0);
         setStats({
           collaborateurs: statsData.nb_collaborateurs,
           vehicules: statsData.nb_vehicules,
           energieTotal: statsData.energie_totale_kwh,
-          co2Evite: statsData.energie_totale_kwh * 0.146,
           coutRemboursable: statsData.cout_total_euro,
+          nbSessions: statsData.nb_sessions,
+          nbSessionsDomicile: statsData.sessions_domicile,
+          energieDomicile: energieDomicile,
         });
       } else {
-        setStats(prev => ({
-          ...prev,
-          collaborateurs: collData.length,
-          vehicules: vehData.length,
-        }));
+        setStats(prev => ({ ...prev, collaborateurs: collData.length, vehicules: vehData.length }));
       }
     } catch (err) {
       console.error("Error loading dashboard data:", err);
@@ -184,19 +192,48 @@ function GestEntrepriseDashboard() {
 
   const filtered = collabs.filter(c => !search || `${c.nom} ${c.prenom}`.toLowerCase().includes(search.toLowerCase()));
 
+  // Compute stats per collaborator
+  const tableData = filtered.map(c => {
+    const v = vehicules.find(v => v.collaborateur_id === c.id);
+    const cSessions = sessions.filter(s => s.collaborateur_id === c.id);
+    
+    const rechDomKwh = cSessions.filter(s => s.is_domicile).reduce((acc, s) => acc + (s.energie_kwh || 0), 0);
+    const rechDomEuro = cSessions.filter(s => s.is_domicile).reduce((acc, s) => acc + (s.cout_euro || 0), 0);
+    const rechHorsDom = cSessions.filter(s => !s.is_domicile).reduce((acc, s) => acc + (s.energie_kwh || 0), 0);
+    
+    // km from odometer delta is complex without smartcar history, so we use dummy for now
+    const kilom = cSessions.length * 50; 
+    const consoMoyenne = kilom > 0 ? ((rechDomKwh + rechHorsDom) / kilom) * 100 : 0;
+    const co2 = kilom * 0.146;
+
+    return {
+      id: c.id,
+      prenom: c.prenom,
+      nom: c.nom,
+      immatriculation: v?.immatriculation || "—",
+      rechDomKwh,
+      rechDomEuro,
+      rechHorsDom,
+      kilom,
+      consoMoyenne,
+      co2
+    };
+  });
+
   return (
     <div className="p-4 sm:p-6 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Tableau de bord</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Pilotage de la flotte et des consommations</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Tableau de bord</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Pilotage de la flotte et des consommations</p>
+        </div>
       </div>
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <KpiCard title="Collaborateurs" value={String(stats.collaborateurs)} icon={Users} colorClass="bg-kpi-home/10 text-kpi-home" />
-        <KpiCard title="Véhicules" value={String(stats.vehicules)} icon={Car} colorClass="bg-kpi-energy/10 text-kpi-energy" />
-        <KpiCard title="Énergie (kWh)" value={`${stats.energieTotal.toFixed(0)}`} icon={Zap} colorClass="bg-kpi-energy/10 text-kpi-energy" />
-        <KpiCard title="CO₂ évité" value={`${stats.co2Evite.toFixed(0)} kg`} icon={Leaf} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
-        <KpiCard title="Remboursements" value={`${stats.coutRemboursable.toFixed(0)} €`} icon={Euro} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard title="Recharges (période)" value={String(stats.nbSessions)} icon={Zap} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
+        <KpiCard title="Recharges Domicile" value={String(stats.nbSessionsDomicile)} icon={Home} colorClass="bg-kpi-home/10 text-kpi-home" />
+        <KpiCard title="Énergie Totale" value={`${stats.energieTotal.toFixed(0)} kWh`} icon={Battery} colorClass="bg-kpi-energy/10 text-kpi-energy" />
+        <KpiCard title="Énergie Domicile" value={`${stats.energieDomicile.toFixed(0)} kWh`} icon={Leaf} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
       </div>
 
       <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -212,21 +249,35 @@ function GestEntrepriseDashboard() {
 
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-card-foreground">Derniers collaborateurs ajoutés</h3>
-          <Link to="/dashboard/listes/collaborateurs" className="text-xs text-primary hover:underline font-medium">Voir tous les collaborateurs</Link>
+          <h3 className="text-lg font-semibold text-card-foreground">Suivi des collaborateurs</h3>
+          <Link to="/dashboard/listes/collaborateurs" className="text-xs text-primary hover:underline font-medium">Gestion complète</Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b border-border bg-muted/50">
-              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Collaborateur</th>
-              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Email</th>
+            <thead><tr className="border-b border-border bg-muted/50 whitespace-nowrap">
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Prénom</th>
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Nom</th>
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Immatriculation</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Rech. Dom (kWh)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Rech. Dom (€)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Rech. Hors (kWh)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Km</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Conso Moy. (kWh/100)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">CO₂ évité (kg)</th>
               <th className="px-6 py-3 text-right font-medium text-muted-foreground">Action</th>
             </tr></thead>
             <tbody>
-              {filtered.slice(0, 10).map(c => (
-                <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-6 py-3 font-medium text-card-foreground">{c.prenom} {c.nom}</td>
-                  <td className="px-6 py-3 text-card-foreground">{c.email}</td>
+              {tableData.slice(0, 10).map(c => (
+                <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 whitespace-nowrap">
+                  <td className="px-6 py-3 font-medium text-card-foreground">{c.prenom}</td>
+                  <td className="px-6 py-3 font-medium text-card-foreground">{c.nom}</td>
+                  <td className="px-6 py-3 font-mono text-card-foreground">{c.immatriculation}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomKwh.toFixed(1)}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomEuro.toFixed(2)}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.rechHorsDom.toFixed(1)}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.kilom.toFixed(0)}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.consoMoyenne.toFixed(1)}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.co2.toFixed(1)}</td>
                   <td className="px-6 py-3 text-right">
                     <Link to="/dashboard/collaborateur/$id" params={{ id: c.id }} className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium">
                       <Eye className="h-3 w-3" /> Fiche
@@ -234,7 +285,7 @@ function GestEntrepriseDashboard() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">Aucun collaborateur trouvé</td></tr>}
+              {tableData.length === 0 && <tr><td colSpan={10} className="px-6 py-8 text-center text-muted-foreground">Aucun collaborateur trouvé</td></tr>}
             </tbody>
           </table>
         </div>

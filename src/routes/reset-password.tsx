@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import logoChargiz from "@/assets/logo-chargiz.png";
 import { Lock, CheckCircle } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      token: (search.token as string) || "",
+    };
+  },
   component: ResetPasswordPage,
   head: () => ({
     meta: [
@@ -15,6 +19,7 @@ export const Route = createFileRoute("/reset-password")({
 });
 
 function ResetPasswordPage() {
+  const { token } = Route.useSearch();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,6 +28,10 @@ function ResetPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!token) {
+      setError("Jeton de réinitialisation manquant ou invalide.");
+      return;
+    }
     if (password !== confirm) {
       setError("Les mots de passe ne correspondent pas.");
       return;
@@ -34,7 +43,17 @@ function ResetPasswordPage() {
     setLoading(true);
     setError("");
     try {
-      await supabase.auth.updateUser();
+      const response = await fetch("https://api.plateforme-test-infinitiax.com/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, new_password: password }),
+      });
+      
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || "Erreur lors de la réinitialisation du mot de passe");
+      }
+      
       setDone(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");

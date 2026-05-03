@@ -154,3 +154,36 @@
     font-family: var(--font-sans);
   }
 }
+
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  .print\:hidden {
+    display: none !important;
+  }
+  
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  .bg-card {
+    background-color: white !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+  }
+  
+  /* Make sidebar disappear if any */
+  aside, nav, header {
+    display: none !important;
+  }
+  
+  /* Reset margins for page layout */
+  @page {
+    margin: 1cm;
+    size: A4;
+  }
+}
