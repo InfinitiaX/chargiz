@@ -8,19 +8,16 @@ COPY package.json package-lock.json* bun.lockb* ./
 # Force dev mode so npm installs devDependencies (vite, typescript, etc.)
 ENV NODE_ENV=development
 # Set network timeout and retries for flaky connections
-RUN npm config set fetch-retry-maxtimeout 120000 && \
-    npm config set fetch-retry-mintimeout 20000 && \
-    npm config set fetch-retries 5 && \
-    npm install --network-timeout=100000
-
+# Install all dependencies including devDependencies (needed for vite)
+RUN npm install --include=dev --network-timeout=100000
 COPY . .
 
-# Build args (only the FastAPI backend URL is needed)
+# Build args (needed at build time for Vite environment injection)
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-# Run vite directly via node — bypasses all PATH/symlink issues on Alpine
-RUN node node_modules/vite/bin/vite.js build
+# Run build using the script defined in package.json
+RUN npm run build
 
 # Production stage — Nginx serving static dist/
 FROM nginx:alpine
