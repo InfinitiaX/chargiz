@@ -7,7 +7,11 @@ COPY package.json package-lock.json* bun.lockb* ./
 
 # Force dev mode so npm installs devDependencies (vite, typescript, etc.)
 ENV NODE_ENV=development
-RUN npm install
+# Set network timeout and retries for flaky connections
+RUN npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retries 5 && \
+    npm install --network-timeout=100000
 
 COPY . .
 
