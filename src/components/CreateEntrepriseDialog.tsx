@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { X, CheckCircle } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 
 export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Props) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     nom: "",
     siren: "",
@@ -18,7 +19,6 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
     adresse: "",
     code_postal: "",
     ville: "",
-    pays: "France",
     email: "",
     telephone: "",
     prix_kwh_defaut: "0.21",
@@ -31,8 +31,9 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
-      await apiFetch("/api/entreprises", {
+      const response = await apiFetch("/api/entreprises", {
         method: "POST",
         body: JSON.stringify({
           nom: form.nom,
@@ -49,8 +50,15 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
           manager_full_name: form.manager_full_name,
         }),
       });
+
+      // Show success message
+      const entrepriseName = response.nom;
+      console.log(`✅ Entreprise "${entrepriseName}" créée avec succès!`);
+      
+      // Call parent callbacks
       onCreated();
-      onClose();
+      
+      // Reset form
       setForm({
         nom: "",
         siren: "",
@@ -59,16 +67,18 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
         adresse: "",
         code_postal: "",
         ville: "",
-        pays: "France",
         email: "",
         telephone: "",
         prix_kwh_defaut: "0.21",
         manager_email: "",
         manager_full_name: "",
       });
-    } catch (err) {
-      console.error("Erreur création entreprise:", err);
-      alert("Erreur lors de la création de l'entreprise");
+      
+      onClose();
+    } catch (err: any) {
+      const errorMessage = err.message || "Erreur lors de la création de l'entreprise";
+      console.error("❌ Erreur création entreprise:", err);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -83,6 +93,13 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
           <h2 className="text-lg font-semibold text-card-foreground">Créer une entreprise</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
         </div>
+        
+        {error && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-medium text-foreground">Dénomination *</label>
@@ -106,7 +123,7 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
             <label className="text-sm font-medium text-foreground">Adresse</label>
             <input className={inputCls} value={form.adresse} onChange={e => setForm(f => ({ ...f, adresse: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium text-foreground">Code postal</label>
               <input className={inputCls} value={form.code_postal} onChange={e => setForm(f => ({ ...f, code_postal: e.target.value }))} />
@@ -114,10 +131,6 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
             <div>
               <label className="text-sm font-medium text-foreground">Ville</label>
               <input className={inputCls} value={form.ville} onChange={e => setForm(f => ({ ...f, ville: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">Pays</label>
-              <input className={inputCls} value={form.pays} onChange={e => setForm(f => ({ ...f, pays: e.target.value }))} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -132,7 +145,7 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
           </div>
           <div>
             <label className="text-sm font-medium text-foreground">Prix kWh par défaut (€)</label>
-            <input type="number" step="0.0001" className={`${inputCls} max-w-xs`} value={form.prix_kwh_defaut} onChange={e => setForm(f => ({ ...f, prix_kwh_defaut: e.target.value }))} />
+            <input type="number" step="0.0001" min="0" className={`${inputCls} max-w-xs`} value={form.prix_kwh_defaut} onChange={e => setForm(f => ({ ...f, prix_kwh_defaut: e.target.value }))} />
           </div>
 
           <div className="pt-4 border-t border-border">
