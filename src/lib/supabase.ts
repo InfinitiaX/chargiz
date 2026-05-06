@@ -56,6 +56,14 @@ class SupabaseQueryBuilder<TRow> {
     this.filters[column] = values.join(",");
     return this; 
   }
+
+  gte(_column: string, _value: any) { return this; }
+  lte(_column: string, _value: any) { return this; }
+  gt(_column: string, _value: any) { return this; }
+  lt(_column: string, _value: any) { return this; }
+  like(_column: string, _value: any) { return this; }
+  ilike(_column: string, _value: any) { return this; }
+  is(_column: string, _value: any) { return this; }
   
   order(column: string, options?: { ascending?: boolean }) { return this; }
   

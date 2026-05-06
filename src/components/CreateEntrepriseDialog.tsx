@@ -109,7 +109,7 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
 
     setLoading(true);
     try {
-      const response = await apiFetch("/api/entreprises", {
+      const response = await apiFetch<{ nom: string }>("/api/entreprises", {
         method: "POST",
         body: JSON.stringify({
           nom: form.nom.trim(),
