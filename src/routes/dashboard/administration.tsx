@@ -71,6 +71,8 @@ function getGroupsForRole(role: AppRole): ActionGroup[] {
 const ROLE_LABELS: Record<AppRole, string> = {
   superadmin: "Superadmin",
   gestionnaire_entreprise: "Gestionnaire d'entreprise",
+  gestionnaire_filiale: "Gestionnaire de filiale",
+  gestionnaire_site: "Gestionnaire de site",
   collaborateur: "Collaborateur",
 };
 
