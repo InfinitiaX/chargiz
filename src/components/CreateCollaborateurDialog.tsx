@@ -11,6 +11,7 @@ interface Props {
 
 export default function CreateCollaborateurDialog({ entrepriseId, open, onClose, onCreated }: Props) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [vehiculesLibres, setVehiculesLibres] = useState<{ id: string; marque: string; modele: string; immatriculation: string; statut_smartcar: string }[]>([]);
   const [vehicleOption, setVehicleOption] = useState<"nouveau" | "existant">("nouveau");
   const [selectedVehiculeId, setSelectedVehiculeId] = useState("");
@@ -42,6 +43,7 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       const profileData = await apiFetch<any>("/api/collaborateurs", {
         method: "POST",
@@ -70,8 +72,9 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
       onCreated();
       onClose();
       setForm({ nom: "", prenom: "", email: "", telephone: "", adresse: "", ville: "" });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erreur création collaborateur:", err);
+      setError(err.message || "Une erreur est survenue lors de la création");
     } finally {
       setLoading(false);
     }
@@ -86,6 +89,13 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
           <h2 className="text-lg font-semibold text-card-foreground">Ajouter un collaborateur</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
