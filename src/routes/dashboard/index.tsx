@@ -31,9 +31,250 @@ function DashboardHome() {
   switch (role) {
     case "superadmin": return <SuperAdminDashboard />;
     case "gestionnaire_entreprise": return <GestEntrepriseDashboard />;
+    case "gestionnaire_filiale": return <ScopedManagerDashboard scope="filiale" />;
+    case "gestionnaire_site": return <ScopedManagerDashboard scope="site" />;
     case "collaborateur": return <ConducteurDashboard />;
     default: return <div className="p-8 text-muted-foreground">Rôle non reconnu.</div>;
   }
+}
+
+/* ═══════════════════════════════════════════
+   Gestionnaire Filiale / Site — Dashboard scopé
+   ═══════════════════════════════════════════ */
+function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
+  const { profile } = useAuth();
+  const filialeId = profile?.filiale_id || "";
+  const siteId = profile?.site_id || "";
+  const scopeId = scope === "filiale" ? filialeId : siteId;
+
+  const [scopeName, setScopeName] = useState<string>("");
+  const [collabs, setCollabs] = useState<any[]>([]);
+  const [vehicules, setVehicules] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [sites, setSites] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [showAddCollab, setShowAddCollab] = useState(false);
+
+  useEffect(() => {
+    if (!scopeId) { setLoading(false); return; }
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeId, scope]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const filterKey = scope === "filiale" ? "filiale_id" : "site_id";
+      const filter = { [filterKey]: scopeId } as Record<string, string>;
+
+      const [collData, vehData, sessData] = await Promise.all([
+        api.collaborateurs.list(filter),
+        api.vehicules.list(filter),
+        api.sessions.list(filter).catch(() => [] as any[]),
+      ]);
+
+      setCollabs(collData);
+      setVehicules(vehData);
+      setSessions(sessData);
+
+      if (scope === "filiale") {
+        const [filiale, sitesData] = await Promise.all([
+          api.filiales.get(scopeId).catch(() => null),
+          api.sites.list({ filiale_id: scopeId }).catch(() => [] as any[]),
+        ]);
+        setScopeName(filiale?.nom || "Ma filiale");
+        setSites(sitesData);
+      } else {
+        const site = await api.sites.get(scopeId).catch(() => null);
+        setScopeName(site?.nom || "Mon site");
+      }
+    } catch (err) {
+      console.error("Error loading scoped dashboard:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!scopeId) {
+    return (
+      <div className="p-8">
+        <p className="text-muted-foreground">
+          Aucune {scope === "filiale" ? "filiale" : "site"} associée à votre compte.
+        </p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  // KPI calc
+  const energieTotale = sessions.reduce((a, s) => a + (s.energie_kwh || 0), 0);
+  const energieDomicile = sessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
+  const coutTotal = sessions.reduce((a, s) => a + (s.cout_euro || 0), 0);
+  const coutRemboursable = sessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.cout_euro || 0), 0);
+  const nbSessionsDomicile = sessions.filter(s => s.is_domicile).length;
+
+  const filtered = collabs.filter(c =>
+    !search || `${c.nom} ${c.prenom} ${c.email || ""}`.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const tableData = filtered.map(c => {
+    const v = vehicules.find(v => v.collaborateur_id === c.id);
+    const cSessions = sessions.filter(s => s.collaborateur_id === c.id);
+    const rechDomKwh = cSessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
+    const rechDomEuro = cSessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.cout_euro || 0), 0);
+    const rechHorsDom = cSessions.filter(s => !s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
+    const km = cSessions.length * 50;
+    const conso = km > 0 ? ((rechDomKwh + rechHorsDom) / km) * 100 : 0;
+    const co2 = km * 0.146;
+    return {
+      id: c.id, prenom: c.prenom, nom: c.nom,
+      immatriculation: v?.immatriculation || "—",
+      rechDomKwh, rechDomEuro, rechHorsDom, km, conso, co2,
+    };
+  });
+
+  const scopeLabel = scope === "filiale" ? "Filiale" : "Site";
+
+  return (
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+          {scopeLabel} — {scopeName}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Pilotage de la flotte et des consommations de votre {scope === "filiale" ? "filiale" : "site"}
+        </p>
+      </div>
+
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard title="Collaborateurs" value={String(collabs.length)} icon={Users} colorClass="bg-kpi-home/10 text-kpi-home" />
+        <KpiCard title="Véhicules" value={String(vehicules.length)} icon={Car} colorClass="bg-kpi-energy/10 text-kpi-energy" />
+        <KpiCard title="Recharges (période)" value={String(sessions.length)} icon={Zap} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
+        <KpiCard title="Énergie totale" value={`${energieTotale.toFixed(0)} kWh`} icon={Battery} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
+      </div>
+
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard title="Recharges domicile" value={String(nbSessionsDomicile)} icon={Home} colorClass="bg-kpi-home/10 text-kpi-home" />
+        <KpiCard title="Énergie domicile" value={`${energieDomicile.toFixed(0)} kWh`} icon={Leaf} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
+        <KpiCard title="Coût total" value={`${coutTotal.toFixed(2)} €`} icon={Euro} colorClass="bg-kpi-away/10 text-kpi-away" />
+        <KpiCard title="À rembourser" value={`${coutRemboursable.toFixed(2)} €`} icon={Euro} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
+      </div>
+
+      {scope === "filiale" && (
+        <div className="mb-8 rounded-xl border border-border bg-card shadow-sm">
+          <div className="border-b border-border px-6 py-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-card-foreground">Sites de la filiale</h3>
+            <Link to="/dashboard/listes/sites" className="text-xs text-primary hover:underline font-medium">Tout voir</Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-border bg-muted/50">
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Nom</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Ville</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Responsable</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">État</th>
+              </tr></thead>
+              <tbody>
+                {sites.length === 0 ? (
+                  <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
+                    <MapPin className="h-6 w-6 mx-auto mb-2 opacity-30" />Aucun site
+                  </td></tr>
+                ) : sites.map(s => (
+                  <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                    <td className="px-6 py-3 font-medium text-card-foreground">{s.nom}</td>
+                    <td className="px-6 py-3 text-card-foreground">{s.ville || "—"}</td>
+                    <td className="px-6 py-3 text-card-foreground">
+                      {s.responsable_prenom || s.responsable_nom
+                        ? `${s.responsable_prenom || ""} ${s.responsable_nom || ""}`.trim()
+                        : "—"}
+                    </td>
+                    <td className="px-6 py-3">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${s.is_active ? "bg-chargiz-teal/10 text-chargiz-teal" : "bg-destructive/10 text-destructive"}`}>
+                        {s.is_active ? "Actif" : "Archivé"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <button onClick={() => setShowAddCollab(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:brightness-95">
+          <Plus className="h-4 w-4" /> Ajouter collaborateur
+        </button>
+        <div className="relative w-full sm:w-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input type="text" placeholder="Rechercher un collaborateur..." value={search} onChange={e => setSearch(e.target.value)}
+            className="w-full sm:w-64 rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="border-b border-border px-6 py-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-card-foreground">Suivi des collaborateurs</h3>
+          <Link to="/dashboard/listes/collaborateurs" className="text-xs text-primary hover:underline font-medium">Gestion complète</Link>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-border bg-muted/50 whitespace-nowrap">
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Prénom</th>
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Nom</th>
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Immatriculation</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Rech. Dom (kWh)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Rech. Dom (€)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Rech. Hors (kWh)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Km</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Conso (kWh/100)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">CO₂ évité (kg)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Action</th>
+            </tr></thead>
+            <tbody>
+              {tableData.length === 0 ? (
+                <tr><td colSpan={10} className="px-6 py-8 text-center text-muted-foreground">Aucun collaborateur</td></tr>
+              ) : tableData.slice(0, 15).map(c => (
+                <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 whitespace-nowrap">
+                  <td className="px-6 py-3 font-medium text-card-foreground">{c.prenom}</td>
+                  <td className="px-6 py-3 font-medium text-card-foreground">{c.nom}</td>
+                  <td className="px-6 py-3 font-mono text-card-foreground">{c.immatriculation}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomKwh.toFixed(1)}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomEuro.toFixed(2)}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.rechHorsDom.toFixed(1)}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.km.toFixed(0)}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.conso.toFixed(1)}</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.co2.toFixed(1)}</td>
+                  <td className="px-6 py-3 text-right">
+                    <Link to="/dashboard/collaborateur/$id" params={{ id: c.id }} className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium">
+                      <Eye className="h-3 w-3" /> Fiche
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {profile?.entreprise_id && (
+        <CreateCollaborateurDialog
+          entrepriseId={profile.entreprise_id}
+          open={showAddCollab}
+          onClose={() => setShowAddCollab(false)}
+          onCreated={loadData}
+        />
+      )}
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════
