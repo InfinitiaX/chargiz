@@ -61,7 +61,7 @@ function MesInfosPage() {
       updates.cout_kwh_domicile = politique.cout_kwh_domicile === "" ? null : Number(politique.cout_kwh_domicile);
       updates.jours_suivi = politique.jours_suivi;
     }
-    await supabase.from("profiles").update(updates).eq("id", profile.id);
+    await supabase.from("profiles").eq("id", profile.id).update(updates);
     setEditMode(false);
     window.location.reload();
   };
