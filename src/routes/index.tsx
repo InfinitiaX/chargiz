@@ -124,8 +124,8 @@ function LoginPage() {
           ) : forgotMode ? (
             <form className="space-y-5" onSubmit={handleForgotPassword}>
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-foreground">Email ou nom d'utilisateur</label>
-                <input id="email" type="text" required placeholder="superadmin ou nom@entreprise.fr" value={email} onChange={e => setEmail(e.target.value)}
+                <label htmlFor="email" className="text-sm font-medium text-foreground">Adresse email</label>
+                <input id="email" type="email" required placeholder="nom@entreprise.fr" value={email} onChange={e => setEmail(e.target.value)}
                   className="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20" />
               </div>
               <button type="submit" disabled={loading} className="w-full rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground transition-all hover:brightness-95 active:scale-[0.98] disabled:opacity-50">
