@@ -1,11 +1,18 @@
+# syntax=docker/dockerfile:1.7
 # Build stage — pure SPA build (Vite + TanStack Router)
 FROM oven/bun:1 AS build-stage
 
 WORKDIR /app
 
+# Copy lockfile first to leverage Docker layer cache —
+# this layer is reused unless package.json or bun.lockb changes
 COPY package.json bun.lockb* ./
-RUN bun install --frozen-lockfile
 
+# Mount bun's cache directory so packages are reused across builds
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
+
+# Now copy the rest of the source code
 COPY . .
 
 # Build args (only the FastAPI backend URL is needed)
