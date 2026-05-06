@@ -4,6 +4,8 @@ import { API_URL, TOKEN_STORAGE_KEY, apiFetch } from "@/lib/api";
 export type AppRole =
   | "superadmin"
   | "gestionnaire_entreprise"
+  | "gestionnaire_filiale"
+  | "gestionnaire_site"
   | "collaborateur";
 
 export interface Profile {
@@ -214,8 +216,20 @@ export function useAuth() {
   const canManage = (targetRole: AppRole): boolean => {
     if (!role) return false;
     const manageableRoles: Record<AppRole, AppRole[]> = {
-      superadmin: ["gestionnaire_entreprise", "collaborateur"],
-      gestionnaire_entreprise: ["collaborateur"],
+      superadmin: [
+        "gestionnaire_entreprise",
+        "gestionnaire_filiale",
+        "gestionnaire_site",
+        "collaborateur",
+      ],
+      gestionnaire_entreprise: [
+        "gestionnaire_entreprise",
+        "gestionnaire_filiale",
+        "gestionnaire_site",
+        "collaborateur",
+      ],
+      gestionnaire_filiale: ["gestionnaire_site", "collaborateur"],
+      gestionnaire_site: ["collaborateur"],
       collaborateur: [],
     };
     return manageableRoles[role]?.includes(targetRole) ?? false;
@@ -226,6 +240,8 @@ export function useAuth() {
     const hierarchy: AppRole[] = [
       "superadmin",
       "gestionnaire_entreprise",
+      "gestionnaire_filiale",
+      "gestionnaire_site",
       "collaborateur",
     ];
     const roleIndex = hierarchy.indexOf(role);

@@ -108,6 +108,12 @@ export const api = {
       return apiFetch<any[]>(`/api/filiales${qs ? `?${qs}` : ""}`);
     },
     get: (id: string) => apiFetch<any>(`/api/filiales/${id}`),
+    create: (data: any) =>
+      apiFetch<any>(`/api/filiales`, { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: any) =>
+      apiFetch<any>(`/api/filiales/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    archive: (id: string) =>
+      apiFetch<any>(`/api/filiales/${id}`, { method: "DELETE" }),
   },
   sites: {
     list: (params?: Record<string, string>) => {
@@ -115,6 +121,12 @@ export const api = {
       return apiFetch<any[]>(`/api/sites${qs ? `?${qs}` : ""}`);
     },
     get: (id: string) => apiFetch<any>(`/api/sites/${id}`),
+    create: (data: any) =>
+      apiFetch<any>(`/api/sites`, { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: any) =>
+      apiFetch<any>(`/api/sites/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    archive: (id: string) =>
+      apiFetch<any>(`/api/sites/${id}`, { method: "DELETE" }),
   },
   vehicules: {
     list: (params?: Record<string, string>) => {

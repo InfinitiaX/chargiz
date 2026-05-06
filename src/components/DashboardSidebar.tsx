@@ -53,9 +53,20 @@ export default function DashboardSidebar() {
 
   const getListesItems = (): NavItem[] => {
     const items: NavItem[] = [];
-    // For Lot 1, we only have Entreprises (for superadmin), Vehicules and Collaborateurs
     if (role === "superadmin") {
       items.push({ to: "/dashboard/listes/entreprises", icon: Building2, label: "Entreprises" });
+    }
+    // Gestionnaire entreprise sees Filiales + Sites
+    if (role === "superadmin" || role === "gestionnaire_entreprise" || role === "gestionnaire_filiale") {
+      items.push({ to: "/dashboard/listes/filiales", icon: Building2, label: "Filiales" });
+    }
+    if (
+      role === "superadmin" ||
+      role === "gestionnaire_entreprise" ||
+      role === "gestionnaire_filiale" ||
+      role === "gestionnaire_site"
+    ) {
+      items.push({ to: "/dashboard/listes/sites", icon: MapPin, label: "Sites" });
     }
     items.push({ to: "/dashboard/listes/vehicules", icon: Car, label: "Véhicules" });
     items.push({ to: "/dashboard/listes/collaborateurs", icon: Users, label: "Collaborateurs" });
