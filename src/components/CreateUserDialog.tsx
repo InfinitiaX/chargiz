@@ -15,12 +15,16 @@ interface Props {
 const ROLE_LABELS: Record<AppRole, string> = {
   superadmin: "Superadmin",
   gestionnaire_entreprise: "Gestionnaire entreprise",
+  gestionnaire_filiale: "Gestionnaire filiale",
+  gestionnaire_site: "Gestionnaire site",
   collaborateur: "Collaborateur",
 };
 
 const MANAGEABLE_ROLES: Record<AppRole, AppRole[]> = {
-  superadmin: ["gestionnaire_entreprise", "collaborateur"],
-  gestionnaire_entreprise: ["collaborateur"],
+  superadmin: ["gestionnaire_entreprise", "gestionnaire_filiale", "gestionnaire_site", "collaborateur"],
+  gestionnaire_entreprise: ["gestionnaire_filiale", "gestionnaire_site", "collaborateur"],
+  gestionnaire_filiale: ["gestionnaire_site", "collaborateur"],
+  gestionnaire_site: ["collaborateur"],
   collaborateur: [],
 };
 
@@ -43,7 +47,6 @@ export default function CreateUserDialog({ actorRole, profile, open, defaultRole
 
   if (!open || availableRoles.length === 0) return null;
 
-  const showScopeFields = actorRole !== "superadmin" && form.role !== "admin";
   const inputCls = "w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
 
   const handleSubmit = async (event: React.FormEvent) => {
