@@ -11,7 +11,8 @@ export const Route = createFileRoute("/dashboard/statistiques")({
 });
 
 function StatistiquesPage() {
-  const { profile } = useAuth();
+  const { profile, role } = useAuth();
+  const isSuperadmin = role === "superadmin";
   const entrepriseId = profile?.entreprise_id || "";
   const [stats, setStats] = useState({
     nbConducteurs: 0,
@@ -24,22 +25,33 @@ function StatistiquesPage() {
   });
   const [dateFrom, setDateFrom] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); d.setDate(1); return d.toISOString().slice(0, 10); });
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!entrepriseId) return;
+    // Superadmin: load platform-wide; otherwise scope to entreprise
+    if (!isSuperadmin && !entrepriseId) {
+      setLoading(false);
+      return;
+    }
     loadStats();
-  }, [entrepriseId, dateFrom, dateTo]);
+  }, [entrepriseId, dateFrom, dateTo, isSuperadmin]);
 
   async function loadStats() {
+    setLoading(true);
     try {
+      // For superadmin, no entreprise_id filter — backend returns all data.
+      // For other roles, the backend auto-scopes by user role (entreprise/filiale/site).
+      const filter = isSuperadmin ? {} : { entreprise_id: entrepriseId };
+      const collabFilter = isSuperadmin ? { active_only: "true" } : { entreprise_id: entrepriseId, active_only: "true" };
+
       const [collabs, vehicules, sessions] = await Promise.all([
-        api.collaborateurs.list({ entreprise_id: entrepriseId, active_only: "true" }),
-        api.vehicules.list({ entreprise_id: entrepriseId }),
-        api.sessions.list({ entreprise_id: entrepriseId }), // Note: backend doesn't support date filtering yet in list_sessions, but we can filter client-side or update backend
+        api.collaborateurs.list(collabFilter),
+        api.vehicules.list(filter),
+        api.sessions.list(filter),
       ]);
 
       const filteredSessions = sessions.filter(s => {
-        const d = s.date_session || s.date_debut; // model says date_session
+        const d = s.date_session || s.date_debut;
         if (!d) return false;
         return d >= dateFrom && d <= (dateTo + "T23:59:59");
       });
@@ -55,6 +67,8 @@ function StatistiquesPage() {
       });
     } catch (err) {
       console.error("Error loading stats:", err);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -62,12 +76,24 @@ function StatistiquesPage() {
   const pctDom = energieTotal > 0 ? (stats.energieDom / energieTotal * 100) : 0;
   const pctHors = energieTotal > 0 ? (stats.energieHors / energieTotal * 100) : 0;
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Statistiques</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Vue globale de l'activité de recharge de l'entreprise</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {isSuperadmin
+              ? "Vue globale plateforme — toutes entreprises confondues"
+              : "Vue globale de l'activité de recharge de l'entreprise"}
+          </p>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm">
           <Calendar className="h-4 w-4 text-muted-foreground" />

@@ -281,70 +281,172 @@ function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
    1. SUPERADMIN — Vue plateforme globale
    ═══════════════════════════════════════════ */
 function SuperAdminDashboard() {
-  const [stats, setStats] = useState({ entreprises: 0, conducteurs: 0, vehicules: 0, sessions: 0, energie: 0 });
-  const [entreprises, setEntreprises] = useState<{ id: string; nom: string; ville: string | null }[]>([]);
+  const [stats, setStats] = useState({
+    entreprises: 0,
+    filiales: 0,
+    sites: 0,
+    conducteurs: 0,
+    vehicules: 0,
+    nbSessions: 0,
+    nbSessionsDomicile: 0,
+    energieTotal: 0,
+    energieDomicile: 0,
+    coutTotal: 0,
+    coutRemboursable: 0,
+  });
+  const [entreprises, setEntreprises] = useState<{ id: string; nom: string; ville: string | null; created_at: string }[]>([]);
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
+  const [topEntreprises, setTopEntreprises] = useState<{ id: string; nom: string; nbSessions: number; energieTotal: number; coutTotal: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); d.setDate(1); return d.toISOString().slice(0, 10); });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [dateFrom, dateTo]);
 
   async function loadData() {
+    setLoading(true);
     try {
-      const [entData, collData, vehData, sessData] = await Promise.all([
+      const [entData, filData, siteData, collData, vehData, sessData] = await Promise.all([
         api.entreprises.list(),
+        api.filiales.list(),
+        api.sites.list(),
         api.collaborateurs.list(),
         api.vehicules.list(),
         api.sessions.list(),
       ]);
-      
+
       setEntreprises(entData);
-      setRecentSessions(sessData.slice(0, 5));
+
+      // Filter sessions by date range (client-side — the backend doesn't support
+      // date filtering on /api/sessions yet; switch to server-side once it does)
+      const fromTs = dateFrom + "T00:00:00";
+      const toTs = dateTo + "T23:59:59";
+      const filteredSessions = sessData.filter((s: any) => {
+        const d = s.date_session || s.date_debut;
+        return d && d >= fromTs && d <= toTs;
+      });
+
+      // Recent sessions: take last 5 across the whole platform (no date filter)
+      const sortedRecent = [...sessData]
+        .sort((a, b) => (b.date_session || "").localeCompare(a.date_session || ""))
+        .slice(0, 5);
+      setRecentSessions(sortedRecent);
+
+      // Top entreprises by session activity within the date range
+      const perEntreprise = new Map<string, { nbSessions: number; energieTotal: number; coutTotal: number }>();
+      for (const s of filteredSessions) {
+        const cur = perEntreprise.get(s.entreprise_id) || { nbSessions: 0, energieTotal: 0, coutTotal: 0 };
+        cur.nbSessions += 1;
+        cur.energieTotal += (s.energie_kwh || 0);
+        cur.coutTotal += (s.cout_euro || 0);
+        perEntreprise.set(s.entreprise_id, cur);
+      }
+      const top = entData
+        .map((e: any) => ({ id: e.id, nom: e.nom, ...(perEntreprise.get(e.id) || { nbSessions: 0, energieTotal: 0, coutTotal: 0 }) }))
+        .sort((a, b) => b.nbSessions - a.nbSessions)
+        .slice(0, 5);
+      setTopEntreprises(top);
+
+      const energieTotal = filteredSessions.reduce((acc: number, s: any) => acc + (s.energie_kwh || 0), 0);
+      const energieDomicile = filteredSessions.filter((s: any) => s.is_domicile).reduce((acc: number, s: any) => acc + (s.energie_kwh || 0), 0);
+      const coutTotal = filteredSessions.reduce((acc: number, s: any) => acc + (s.cout_euro || 0), 0);
+      const coutRemboursable = filteredSessions.filter((s: any) => s.is_domicile).reduce((acc: number, s: any) => acc + (s.cout_euro || 0), 0);
+
       setStats({
         entreprises: entData.length,
+        filiales: filData.length,
+        sites: siteData.length,
         conducteurs: collData.length,
         vehicules: vehData.length,
-        sessions: sessData.length,
-        energie: sessData.reduce((acc, s) => acc + (s.energie_kwh || 0), 0),
+        nbSessions: filteredSessions.length,
+        nbSessionsDomicile: filteredSessions.filter((s: any) => s.is_domicile).length,
+        energieTotal,
+        energieDomicile,
+        coutTotal,
+        coutRemboursable,
       });
     } catch (err) {
       console.error("Error loading superadmin stats:", err);
+    } finally {
+      setLoading(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
   }
 
   return (
     <div className="p-4 sm:p-6 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Plateforme ChargiZ</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Vue globale multi-entreprises — SuperAdmin</p>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Plateforme ChargiZ</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Vue globale multi-entreprises — SuperAdmin</p>
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-transparent text-xs outline-none" />
+          <span className="text-xs text-muted-foreground">→</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-transparent text-xs outline-none" />
+        </div>
       </div>
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* Plateforme — comptes globaux (indépendants de la période) */}
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Organisation</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
+      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard title="Entreprises" value={String(stats.entreprises)} icon={Building2} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
+        <KpiCard title="Filiales" value={String(stats.filiales)} icon={Building2} colorClass="bg-kpi-energy/10 text-kpi-energy" />
+        <KpiCard title="Sites" value={String(stats.sites)} icon={MapPin} colorClass="bg-kpi-away/10 text-kpi-away" />
         <KpiCard title="Conducteurs" value={String(stats.conducteurs)} icon={Users} colorClass="bg-kpi-home/10 text-kpi-home" />
-        <KpiCard title="Véhicules" value={String(stats.vehicules)} icon={Car} colorClass="bg-kpi-energy/10 text-kpi-energy" />
-        <KpiCard title="Sessions" value={String(stats.sessions)} icon={Zap} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
-        <KpiCard title="Énergie (kWh)" value={stats.energie.toFixed(0)} icon={Battery} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
+        <KpiCard title="Véhicules" value={String(stats.vehicules)} icon={Car} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
+      </div>
+
+      {/* Activité de recharge — sur la période sélectionnée */}
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Activité de recharge (période)</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
+      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <KpiCard title="Sessions" value={String(stats.nbSessions)} icon={Zap} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
+        <KpiCard title="Sessions domicile" value={String(stats.nbSessionsDomicile)} icon={Home} colorClass="bg-kpi-home/10 text-kpi-home" />
+        <KpiCard title="Énergie totale" value={`${stats.energieTotal.toFixed(0)} kWh`} icon={Battery} colorClass="bg-kpi-energy/10 text-kpi-energy" />
+        <KpiCard title="Énergie domicile" value={`${stats.energieDomicile.toFixed(0)} kWh`} icon={Leaf} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
+        <KpiCard title="Coût total" value={`${stats.coutTotal.toFixed(2)} €`} icon={Euro} colorClass="bg-kpi-away/10 text-kpi-away" />
+        <KpiCard title="À rembourser" value={`${stats.coutRemboursable.toFixed(2)} €`} icon={Euro} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-border bg-card shadow-sm">
           <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-card-foreground">Entreprises</h3>
+            <h3 className="text-lg font-semibold text-card-foreground">Top entreprises (par activité)</h3>
             <Link to="/dashboard/listes/entreprises" className="text-xs text-primary hover:underline font-medium">Tout voir</Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="border-b border-border bg-muted/50">
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Nom</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Ville</th>
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Entreprise</th>
+                <th className="px-6 py-3 text-right font-medium text-muted-foreground">Sessions</th>
+                <th className="px-6 py-3 text-right font-medium text-muted-foreground">kWh</th>
+                <th className="px-6 py-3 text-right font-medium text-muted-foreground">Coût</th>
               </tr></thead>
               <tbody>
-                {entreprises.map(e => (
+                {topEntreprises.length === 0 ? (
+                  <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">Aucune activité sur la période</td></tr>
+                ) : topEntreprises.map(e => (
                   <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                     <td className="px-6 py-3 font-medium text-card-foreground">{e.nom}</td>
-                    <td className="px-6 py-3 text-card-foreground">{e.ville || "—"}</td>
+                    <td className="px-6 py-3 text-right text-card-foreground">{e.nbSessions}</td>
+                    <td className="px-6 py-3 text-right text-card-foreground">{e.energieTotal.toFixed(1)}</td>
+                    <td className="px-6 py-3 text-right text-card-foreground">{e.coutTotal.toFixed(2)} €</td>
                   </tr>
                 ))}
-                {entreprises.length === 0 && <tr><td colSpan={2} className="px-6 py-8 text-center text-muted-foreground">Aucune entreprise</td></tr>}
               </tbody>
             </table>
           </div>
@@ -353,7 +455,6 @@ function SuperAdminDashboard() {
         <div className="rounded-xl border border-border bg-card shadow-sm">
           <div className="border-b border-border px-6 py-4 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-card-foreground">Sessions récentes</h3>
-            <Link to="/dashboard/mes-consommations" className="text-xs text-primary hover:underline font-medium">Tout voir</Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -361,19 +462,53 @@ function SuperAdminDashboard() {
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Date</th>
                 <th className="px-6 py-3 text-right font-medium text-muted-foreground">kWh</th>
                 <th className="px-6 py-3 text-right font-medium text-muted-foreground">Coût</th>
+                <th className="px-6 py-3 text-center font-medium text-muted-foreground">Type</th>
               </tr></thead>
               <tbody>
-                {recentSessions.map(s => (
+                {recentSessions.length === 0 ? (
+                  <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">Aucune session</td></tr>
+                ) : recentSessions.map(s => (
                   <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                     <td className="px-6 py-3 text-card-foreground">{s.date_session ? new Date(s.date_session).toLocaleDateString("fr-FR") : "—"}</td>
                     <td className="px-6 py-3 text-right text-card-foreground">{(s.energie_kwh || 0).toFixed(1)}</td>
                     <td className="px-6 py-3 text-right text-card-foreground">{(s.cout_euro || 0).toFixed(2)} €</td>
+                    <td className="px-6 py-3 text-center">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${s.is_domicile ? "bg-kpi-home/10 text-kpi-home" : "bg-kpi-away/10 text-kpi-away"}`}>
+                        {s.is_domicile ? "Domicile" : "Hors dom."}
+                      </span>
+                    </td>
                   </tr>
                 ))}
-                {recentSessions.length === 0 && <tr><td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">Aucune session</td></tr>}
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-border bg-card shadow-sm">
+        <div className="border-b border-border px-6 py-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-card-foreground">Toutes les entreprises</h3>
+          <Link to="/dashboard/listes/entreprises" className="text-xs text-primary hover:underline font-medium">Gestion complète</Link>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-border bg-muted/50">
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Nom</th>
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Ville</th>
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Créée le</th>
+            </tr></thead>
+            <tbody>
+              {entreprises.length === 0 ? (
+                <tr><td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">Aucune entreprise</td></tr>
+              ) : entreprises.map(e => (
+                <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                  <td className="px-6 py-3 font-medium text-card-foreground">{e.nom}</td>
+                  <td className="px-6 py-3 text-card-foreground">{e.ville || "—"}</td>
+                  <td className="px-6 py-3 text-card-foreground">{new Date(e.created_at).toLocaleDateString("fr-FR")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
