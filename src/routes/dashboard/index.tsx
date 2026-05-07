@@ -714,9 +714,10 @@ function ConducteurDashboard() {
   async function loadData() {
     if (!profile) return;
     try {
+      // Pas besoin de passer collaborateur_id : le backend scope déjà sur le user courant
       const [vehData, sessData] = await Promise.all([
-        api.vehicules.list({ collaborateur_id: profile.id }),
-        api.sessions.list({ collaborateur_id: profile.id }),
+        api.vehicules.list(),
+        api.sessions.list(),
       ]);
       
       if (vehData.length > 0) setVehicule(vehData[0]);
