@@ -135,6 +135,8 @@ export const api = {
     },
     get: (id: string) => apiFetch<any>(`/api/collaborateurs/${id}`),
     update: (id: string, data: any) => apiFetch<any>(`/api/collaborateurs/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    setHome: (id: string, latitude: number, longitude: number) =>
+      apiFetch<any>(`/api/collaborateurs/${id}/home`, { method: "POST", body: JSON.stringify({ latitude, longitude }) }),
   },
   filiales: {
     list: (params?: Record<string, string>) => {

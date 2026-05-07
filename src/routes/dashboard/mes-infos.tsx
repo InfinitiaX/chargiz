@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
-import { User, Car, Shield, Save } from "lucide-react";
+import { User, Car, Shield, Save, MapPin } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/mes-infos")({
   component: MesInfosPage,
@@ -168,6 +168,52 @@ function MesInfosPage() {
             </div>
           )}
         </div>
+
+        {/* Domicile (geofencing) */}
+        {user?.role === "collaborateur" && collaborateur && (
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-card-foreground">
+                <MapPin className="h-5 w-5 text-primary" /> Mon domicile
+              </h3>
+              {collaborateur.home_latitude && collaborateur.home_longitude && (
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-chargiz-teal/10 text-chargiz-teal">
+                  Défini
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Pour différencier les recharges domicile/extérieures, ChargiZ a besoin de connaître la position GPS de votre domicile.
+              Cliquez sur le bouton ci-dessous depuis votre domicile.
+            </p>
+            {collaborateur.home_latitude && collaborateur.home_longitude && (
+              <p className="text-xs text-muted-foreground mb-3 font-mono">
+                Position actuelle : {collaborateur.home_latitude.toFixed(5)}, {collaborateur.home_longitude.toFixed(5)}
+              </p>
+            )}
+            <button
+              onClick={() => {
+                if (!navigator.geolocation) { alert("Géolocalisation non supportée par votre navigateur."); return; }
+                navigator.geolocation.getCurrentPosition(
+                  async pos => {
+                    try {
+                      const updated = await api.collaborateurs.setHome(collaborateur.id, pos.coords.latitude, pos.coords.longitude);
+                      setCollaborateur({ ...collaborateur, home_latitude: updated.latitude, home_longitude: updated.longitude });
+                    } catch (e: any) {
+                      alert("Erreur : " + (e.message ?? "inconnue"));
+                    }
+                  },
+                  err => alert("Impossible de récupérer votre position : " + err.message),
+                  { enableHighAccuracy: true, timeout: 10000 }
+                );
+              }}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light"
+            >
+              <MapPin className="h-4 w-4" />
+              {collaborateur.home_latitude ? "Mettre à jour ma position domicile" : "Définir ma position domicile"}
+            </button>
+          </div>
+        )}
 
         {/* Politique de recharge */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
