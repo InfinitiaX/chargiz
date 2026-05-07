@@ -14,6 +14,22 @@ export interface User {
   site_id: string | null;
 }
 
+// ─── Lightweight pub/sub for cross-page data invalidation ───
+// Fire `notifyDataChanged()` whenever a mutation succeeds. Pages can subscribe
+// via `onDataChanged(callback)` to trigger a refetch — even if they were
+// mounted before the mutation happened.
+const DATA_CHANGED_EVENT = "chargiz:data-changed";
+export function notifyDataChanged(kind?: string) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT, { detail: { kind } }));
+}
+export function onDataChanged(cb: (kind?: string) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const handler = (e: Event) => cb((e as CustomEvent).detail?.kind);
+  window.addEventListener(DATA_CHANGED_EVENT, handler);
+  return () => window.removeEventListener(DATA_CHANGED_EVENT, handler);
+}
+
 async function readErrorMessage(response: Response, fallback: string) {
   try {
     const payload = await response.json();
@@ -84,6 +100,14 @@ export async function apiFetch<T>(
     throw new Error(await readErrorMessage(response, "Erreur API"));
   }
 
+  // Successful mutation → broadcast so other pages refetch.
+  const method = (options.method || "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    notifyDataChanged(path);
+  }
+
+  // 204 No Content has no body → return undefined as T
+  if (response.status === 204) return undefined as unknown as T;
   return response.json() as Promise<T>;
 }
 

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
+import { api, onDataChanged } from "@/lib/api";
 import { useAuth, type AppRole } from "@/hooks/useAuth";
 import KpiCard from "@/components/KpiCard";
 import CreateCollaborateurDialog from "@/components/CreateCollaborateurDialog";
@@ -309,6 +309,16 @@ function SuperAdminDashboard() {
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
 
   useEffect(() => { loadData(); }, [dateFrom, dateTo]);
+  useEffect(() => {
+    const onFocus = () => loadData();
+    window.addEventListener("focus", onFocus);
+    const unsub = onDataChanged(() => loadData());
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      unsub();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo]);
 
   async function loadData() {
     setLoading(true);
@@ -540,6 +550,16 @@ function GestEntrepriseDashboard() {
   const [showAddCollab, setShowAddCollab] = useState(false);
 
   useEffect(() => { if (entrepriseId) loadData(); }, [entrepriseId]);
+  useEffect(() => {
+    const onFocus = () => { if (entrepriseId) loadData(); };
+    window.addEventListener("focus", onFocus);
+    const unsub = onDataChanged(() => { if (entrepriseId) loadData(); });
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      unsub();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entrepriseId]);
 
   async function loadData() {
     try {
