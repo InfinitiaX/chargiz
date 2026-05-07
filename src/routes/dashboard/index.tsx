@@ -136,9 +136,11 @@ function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
     const rechDomKwh = cSessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
     const rechDomEuro = cSessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.cout_euro || 0), 0);
     const rechHorsDom = cSessions.filter(s => !s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
-    const km = cSessions.length * 50;
-    const conso = km > 0 ? ((rechDomKwh + rechHorsDom) / km) * 100 : 0;
-    const co2 = km * 0.146;
+    // [Smartcar TODO] km / conso / CO2 require real odometer data from Smartcar.
+    // Until the premium API is wired, these stay null and render as "—".
+    const km: number | null = null;
+    const conso: number | null = null;
+    const co2: number | null = null;
     return {
       id: c.id, prenom: c.prenom, nom: c.nom,
       immatriculation: v?.immatriculation || "—",
@@ -255,9 +257,9 @@ function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
                   <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomKwh.toFixed(1)}</td>
                   <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomEuro.toFixed(2)}</td>
                   <td className="px-6 py-3 text-right text-card-foreground">{c.rechHorsDom.toFixed(1)}</td>
-                  <td className="px-6 py-3 text-right text-card-foreground">{c.km.toFixed(0)}</td>
-                  <td className="px-6 py-3 text-right text-card-foreground">{c.conso.toFixed(1)}</td>
-                  <td className="px-6 py-3 text-right text-card-foreground">{c.co2.toFixed(1)}</td>
+                  <td className="px-6 py-3 text-right text-muted-foreground">{c.km != null ? c.km.toFixed(0) : "—"}</td>
+                  <td className="px-6 py-3 text-right text-muted-foreground">{c.conso != null ? c.conso.toFixed(1) : "—"}</td>
+                  <td className="px-6 py-3 text-right text-muted-foreground">{c.co2 != null ? c.co2.toFixed(1) : "—"}</td>
                   <td className="px-6 py-3 text-right">
                     <Link to="/dashboard/collaborateur/$id" params={{ id: c.id }} className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium">
                       <Eye className="h-3 w-3" /> Fiche
@@ -581,11 +583,12 @@ function GestEntrepriseDashboard() {
     const rechDomKwh = cSessions.filter(s => s.is_domicile).reduce((acc, s) => acc + (s.energie_kwh || 0), 0);
     const rechDomEuro = cSessions.filter(s => s.is_domicile).reduce((acc, s) => acc + (s.cout_euro || 0), 0);
     const rechHorsDom = cSessions.filter(s => !s.is_domicile).reduce((acc, s) => acc + (s.energie_kwh || 0), 0);
-    
-    // km from odometer delta is complex without smartcar history, so we use dummy for now
-    const kilom = cSessions.length * 50; 
-    const consoMoyenne = kilom > 0 ? ((rechDomKwh + rechHorsDom) / kilom) * 100 : 0;
-    const co2 = kilom * 0.146;
+
+    // [Smartcar TODO] km / conso / CO2 require real odometer data — left null
+    // until Smartcar premium is wired. UI renders "—" instead of fake numbers.
+    const kilom: number | null = null;
+    const consoMoyenne: number | null = null;
+    const co2: number | null = null;
 
     return {
       id: c.id,
@@ -656,9 +659,9 @@ function GestEntrepriseDashboard() {
                   <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomKwh.toFixed(1)}</td>
                   <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomEuro.toFixed(2)}</td>
                   <td className="px-6 py-3 text-right text-card-foreground">{c.rechHorsDom.toFixed(1)}</td>
-                  <td className="px-6 py-3 text-right text-card-foreground">{c.kilom.toFixed(0)}</td>
-                  <td className="px-6 py-3 text-right text-card-foreground">{c.consoMoyenne.toFixed(1)}</td>
-                  <td className="px-6 py-3 text-right text-card-foreground">{c.co2.toFixed(1)}</td>
+                  <td className="px-6 py-3 text-right text-muted-foreground">{c.kilom != null ? c.kilom.toFixed(0) : "—"}</td>
+                  <td className="px-6 py-3 text-right text-muted-foreground">{c.consoMoyenne != null ? c.consoMoyenne.toFixed(1) : "—"}</td>
+                  <td className="px-6 py-3 text-right text-muted-foreground">{c.co2 != null ? c.co2.toFixed(1) : "—"}</td>
                   <td className="px-6 py-3 text-right">
                     <Link to="/dashboard/collaborateur/$id" params={{ id: c.id }} className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium">
                       <Eye className="h-3 w-3" /> Fiche

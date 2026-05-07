@@ -92,7 +92,17 @@ export const api = {
   entreprises: {
     list: () => apiFetch<any[]>("/api/entreprises"),
     get: (id: string) => apiFetch<any>(`/api/entreprises/${id}`),
+    update: (id: string, data: any) =>
+      apiFetch<any>(`/api/entreprises/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     delete: (id: string) => apiFetch<any>(`/api/entreprises/${id}`, { method: "DELETE" }),
+  },
+  users: {
+    list: (params?: Record<string, string>) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiFetch<any[]>(`/api/users${qs ? `?${qs}` : ""}`);
+    },
+    update: (id: number | string, data: any) =>
+      apiFetch<any>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   },
   collaborateurs: {
     list: (params?: Record<string, string>) => {
