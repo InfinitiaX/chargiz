@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Building2, User, CheckCircle2, ChevronRight } from "lucide-react";
+import { X, Building2, User, CheckCircle2, ChevronRight, Wand2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 interface Props {
@@ -179,9 +179,39 @@ export default function CreateEntrepriseDialog({ open, onClose, onCreated }: Pro
               <p className="text-xs text-muted-foreground">Les champs marqués * sont obligatoires</p>
             </div>
           </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const rand = Math.floor(1000 + Math.random() * 9000);
+                const siren = String(Math.floor(100000000 + Math.random() * 900000000));
+                setForm(f => ({
+                  ...f,
+                  nom: `Acme Test ${rand}`,
+                  siren,
+                  siret: `${siren}00012`,
+                  numero_tva: `FR${String(rand).padStart(2, "0")}${siren}`,
+                  adresse: "12 rue de la Paix",
+                  code_postal: "75001",
+                  ville: "Paris",
+                  email: `contact${rand}@acme-test.fr`,
+                  telephone: "0612345678",
+                  prix_kwh_defaut: "0.21",
+                  manager_full_name: "Jean Dupont",
+                  // manager_email volontairement non rempli — tu le saisis
+                }));
+                setFieldErrors({});
+              }}
+              title="Remplir avec des valeurs de test (sauf email gestionnaire)"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-dashed border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              Remplir
+            </button>
+            <button onClick={onClose} className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Success */}
