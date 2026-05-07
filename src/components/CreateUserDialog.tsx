@@ -20,11 +20,16 @@ const ROLE_LABELS: Record<AppRole, string> = {
   collaborateur: "Collaborateur",
 };
 
+// Lot 1 scope: only superadmin and gestionnaire_entreprise can create accounts.
+// gestionnaire_filiale / gestionnaire_site target roles are deferred to Lot 2 (CDC §6.2).
 const MANAGEABLE_ROLES: Record<AppRole, AppRole[]> = {
-  superadmin: ["gestionnaire_entreprise", "gestionnaire_filiale", "gestionnaire_site", "collaborateur"],
-  gestionnaire_entreprise: ["gestionnaire_filiale", "gestionnaire_site", "collaborateur"],
-  gestionnaire_filiale: ["gestionnaire_site", "collaborateur"],
-  gestionnaire_site: ["collaborateur"],
+  superadmin: ["gestionnaire_entreprise", "collaborateur"],
+  gestionnaire_entreprise: ["gestionnaire_entreprise", "collaborateur"],
+  // [Lot 2] role-scoped account creation:
+  // gestionnaire_filiale: ["gestionnaire_site", "collaborateur"],
+  // gestionnaire_site: ["collaborateur"],
+  gestionnaire_filiale: [],
+  gestionnaire_site: [],
   collaborateur: [],
 };
 

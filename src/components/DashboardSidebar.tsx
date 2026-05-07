@@ -51,23 +51,22 @@ export default function DashboardSidebar() {
 
   const isCollab = role === "collaborateur";
 
+  // Lot 1 scope: Superadmin + Gestionnaire entreprise.
+  // Filiales/Sites menus and gestionnaire_filiale/site role gating are deferred to Lot 2 (CDC §6.2).
   const getListesItems = (): NavItem[] => {
     const items: NavItem[] = [];
     if (role === "superadmin") {
       items.push({ to: "/dashboard/listes/entreprises", icon: Building2, label: "Entreprises" });
     }
-    // Gestionnaire entreprise sees Filiales + Sites
-    if (role === "superadmin" || role === "gestionnaire_entreprise" || role === "gestionnaire_filiale") {
-      items.push({ to: "/dashboard/listes/filiales", icon: Building2, label: "Filiales" });
-    }
-    if (
-      role === "superadmin" ||
-      role === "gestionnaire_entreprise" ||
-      role === "gestionnaire_filiale" ||
-      role === "gestionnaire_site"
-    ) {
-      items.push({ to: "/dashboard/listes/sites", icon: MapPin, label: "Sites" });
-    }
+    // [Lot 2] Filiales menu — hidden until Lot 2.
+    // if (role === "superadmin" || role === "gestionnaire_entreprise" || role === "gestionnaire_filiale") {
+    //   items.push({ to: "/dashboard/listes/filiales", icon: Building2, label: "Filiales" });
+    // }
+    // [Lot 2] Sites menu — hidden until Lot 2.
+    // if (role === "superadmin" || role === "gestionnaire_entreprise" ||
+    //     role === "gestionnaire_filiale" || role === "gestionnaire_site") {
+    //   items.push({ to: "/dashboard/listes/sites", icon: MapPin, label: "Sites" });
+    // }
     items.push({ to: "/dashboard/listes/vehicules", icon: Car, label: "Véhicules" });
     items.push({ to: "/dashboard/listes/collaborateurs", icon: Users, label: "Collaborateurs" });
     return items;

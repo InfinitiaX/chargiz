@@ -31,8 +31,13 @@ function DashboardHome() {
   switch (role) {
     case "superadmin": return <SuperAdminDashboard />;
     case "gestionnaire_entreprise": return <GestEntrepriseDashboard />;
-    case "gestionnaire_filiale": return <ScopedManagerDashboard scope="filiale" />;
-    case "gestionnaire_site": return <ScopedManagerDashboard scope="site" />;
+    // [Lot 2] dedicated scoped dashboards for filiale/site managers.
+    // For Lot 1, fall back to the entreprise dashboard so existing test accounts keep working.
+    case "gestionnaire_filiale":
+    case "gestionnaire_site":
+      return <GestEntrepriseDashboard />;
+    // case "gestionnaire_filiale": return <ScopedManagerDashboard scope="filiale" />;
+    // case "gestionnaire_site": return <ScopedManagerDashboard scope="site" />;
     case "collaborateur": return <ConducteurDashboard />;
     default: return <div className="p-8 text-muted-foreground">Rôle non reconnu.</div>;
   }
