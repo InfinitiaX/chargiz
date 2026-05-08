@@ -21,12 +21,16 @@ interface Vehicule {
   statut_smartcar: string;
   statut_affectation: string;
   collaborateur_id: string | null;
+  entreprise_id: string;
 }
 
 function ListeVehicules() {
-  const { profile, loading } = useAuth();
+  const { profile, role, loading } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
+  const isSuperadmin = role === "superadmin";
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
+  const [collabs, setCollabs] = useState<Map<string, any>>(new Map());
+  const [entreprises, setEntreprises] = useState<Map<string, any>>(new Map());
   const [search, setSearch] = useState("");
   const [filterStatut, setFilterStatut] = useState("");
   const [filterAbo, setFilterAbo] = useState("");
@@ -34,14 +38,23 @@ function ListeVehicules() {
   const [editVeh, setEditVeh] = useState<Vehicule | null>(null);
 
   useEffect(() => {
-    if (loading || !entrepriseId) return;
+    if (loading) return;
+    // Pour superadmin pas besoin d'entreprise_id (vue globale)
+    if (!isSuperadmin && !entrepriseId) return;
     loadVehicules();
-  }, [loading, entrepriseId]);
+  }, [loading, entrepriseId, isSuperadmin]);
 
   async function loadVehicules() {
     try {
-      const data = await apiFetch<Vehicule[]>(`/api/vehicules?entreprise_id=${entrepriseId}`);
-      setVehicules(data);
+      const url = isSuperadmin ? "/api/vehicules" : `/api/vehicules?entreprise_id=${entrepriseId}`;
+      const [vehs, collabsArr, entreprisesArr] = await Promise.all([
+        apiFetch<Vehicule[]>(url),
+        apiFetch<any[]>("/api/collaborateurs"),
+        isSuperadmin ? apiFetch<any[]>("/api/entreprises") : Promise.resolve([]),
+      ]);
+      setVehicules(vehs);
+      setCollabs(new Map(collabsArr.map((c: any) => [c.id, c])));
+      setEntreprises(new Map((entreprisesArr || []).map((e: any) => [e.id, e])));
     } catch (err) {
       console.error("Error loading vehicles:", err);
     }
@@ -150,6 +163,8 @@ function ListeVehicules() {
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Véhicule</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Immat</th>
+                {isSuperadmin && <th className="px-6 py-3 text-left font-medium text-muted-foreground">Entreprise</th>}
+                <th className="px-6 py-3 text-left font-medium text-muted-foreground">Collaborateur affilié</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Batterie</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Statut</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Smartcar</th>
@@ -158,8 +173,11 @@ function ListeVehicules() {
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">Aucun véhicule trouvé</td></tr>
-              ) : filtered.map(v => (
+                <tr><td colSpan={isSuperadmin ? 8 : 7} className="px-6 py-12 text-center text-muted-foreground">Aucun véhicule trouvé</td></tr>
+              ) : filtered.map(v => {
+                const collab = v.collaborateur_id ? collabs.get(v.collaborateur_id) : null;
+                const ent = isSuperadmin ? entreprises.get(v.entreprise_id) : null;
+                return (
                 <tr key={v.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
@@ -168,6 +186,22 @@ function ListeVehicules() {
                     </div>
                   </td>
                   <td className="px-6 py-4 font-mono text-xs text-card-foreground">{v.immatriculation || "—"}</td>
+                  {isSuperadmin && (
+                    <td className="px-6 py-4">
+                      {ent ? (
+                        <Link to="/dashboard/listes/entreprises/$id" params={{ id: ent.id }} className="text-card-foreground hover:underline">
+                          {ent.nom}
+                        </Link>
+                      ) : <span className="text-muted-foreground italic text-xs">—</span>}
+                    </td>
+                  )}
+                  <td className="px-6 py-4">
+                    {collab ? (
+                      <Link to="/dashboard/collaborateur/$id" params={{ id: collab.id }} className="text-card-foreground hover:underline">
+                        {collab.prenom} {collab.nom}
+                      </Link>
+                    ) : <span className="text-muted-foreground italic text-xs">Non affilié</span>}
+                  </td>
                   <td className="px-6 py-4 text-card-foreground">{v.capacite_batterie ? `${v.capacite_batterie} kWh` : "—"}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -195,7 +229,8 @@ function ListeVehicules() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

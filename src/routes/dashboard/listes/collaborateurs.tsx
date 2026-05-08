@@ -19,12 +19,15 @@ interface Collab {
   telephone: string | null;
   is_active: boolean;
   created_at: string;
+  entreprise_id: string;
 }
 
 function ListeCollaborateurs() {
-  const { profile, loading } = useAuth();
+  const { profile, role, loading } = useAuth();
   const entrepriseId = profile?.entreprise_id || "";
+  const isSuperadmin = role === "superadmin";
   const [collaborateurs, setCollaborateurs] = useState<Collab[]>([]);
+  const [entreprises, setEntreprises] = useState<Map<string, any>>(new Map());
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -37,8 +40,12 @@ function ListeCollaborateurs() {
 
   async function loadData() {
     const params = entrepriseId ? `?entreprise_id=${entrepriseId}` : "";
-    const data = await apiFetch<Collab[]>(`/api/collaborateurs${params}`);
-    setCollaborateurs(data);
+    const [collabs, ents] = await Promise.all([
+      apiFetch<Collab[]>(`/api/collaborateurs${params}`),
+      isSuperadmin ? apiFetch<any[]>("/api/entreprises") : Promise.resolve([] as any[]),
+    ]);
+    setCollaborateurs(collabs);
+    setEntreprises(new Map((ents || []).map((e: any) => [e.id, e])));
   }
 
   const handleArchive = async (id: string) => {
@@ -158,6 +165,7 @@ function ListeCollaborateurs() {
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Collaborateur</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Email</th>
+                {isSuperadmin && <th className="px-6 py-3 text-left font-medium text-muted-foreground">Entreprise</th>}
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Téléphone</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">État</th>
                 <th className="px-6 py-3 text-right font-medium text-muted-foreground">Actions</th>
@@ -165,8 +173,10 @@ function ListeCollaborateurs() {
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Aucun collaborateur trouvé</td></tr>
-              ) : filtered.map((collab) => (
+                <tr><td colSpan={isSuperadmin ? 6 : 5} className="px-6 py-12 text-center text-muted-foreground">Aucun collaborateur trouvé</td></tr>
+              ) : filtered.map((collab) => {
+                const ent = isSuperadmin ? entreprises.get(collab.entreprise_id) : null;
+                return (
                 <tr key={collab.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
@@ -175,6 +185,15 @@ function ListeCollaborateurs() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-card-foreground">{collab.email}</td>
+                  {isSuperadmin && (
+                    <td className="px-6 py-4">
+                      {ent ? (
+                        <Link to="/dashboard/listes/entreprises/$id" params={{ id: ent.id }} className="text-card-foreground hover:underline">
+                          {ent.nom}
+                        </Link>
+                      ) : <span className="text-muted-foreground italic text-xs">—</span>}
+                    </td>
+                  )}
                   <td className="px-6 py-4 text-card-foreground">{collab.telephone || "—"}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${collab.is_active ? "bg-chargiz-teal/10 text-chargiz-teal" : "bg-destructive/10 text-destructive"}`}>
@@ -198,7 +217,8 @@ function ListeCollaborateurs() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

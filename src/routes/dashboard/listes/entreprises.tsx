@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { api, apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -117,9 +117,14 @@ function ListeEntreprises() {
                   <td className="px-6 py-4 text-card-foreground">{e.email || "—"}</td>
                   <td className="px-6 py-4 text-card-foreground">{new Date(e.created_at).toLocaleDateString("fr-FR")}</td>
                   <td className="px-6 py-4 flex items-center gap-2">
-                    <button className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Voir">
+                    <Link
+                      to="/dashboard/listes/entreprises/$id"
+                      params={{ id: e.id }}
+                      className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title="Voir"
+                    >
                       <Eye className="h-4 w-4" />
-                    </button>
+                    </Link>
                     <button 
                       onClick={async () => {
                         if (confirm(`Voulez-vous vraiment supprimer l'entreprise ${e.nom} ?`)) {
