@@ -259,9 +259,89 @@
       0 0 0 3px color-mix(in oklch, var(--chargiz-teal) 15%, transparent);
   }
 
-  /* Tables : hover row sans borders */
-  tbody tr {
+  /* ======================================
+     Tables : refonte moderne
+     S'applique aux <table class="w-full text-sm"> standardisées
+     ====================================== */
+  table.w-full {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  /* Headers : compact, espacé, en uppercase léger */
+  table.w-full thead tr {
+    background: transparent !important;
+  }
+
+  table.w-full thead th {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-muted-foreground);
+    padding-top: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+    background: color-mix(in oklch, var(--color-muted) 60%, transparent);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  table.w-full thead th:first-child {
+    border-top-left-radius: 0.75rem;
+  }
+  table.w-full thead th:last-child {
+    border-top-right-radius: 0.75rem;
+  }
+
+  /* Lignes : séparateurs très fins, hover net */
+  table.w-full tbody tr {
     transition: background-color 120ms ease;
+  }
+
+  table.w-full tbody tr:not(:last-child) td {
+    border-bottom: 1px solid color-mix(in oklch, var(--color-border) 50%, transparent);
+  }
+
+  table.w-full tbody tr:hover {
+    background-color: color-mix(in oklch, var(--chargiz-teal) 4%, transparent);
+  }
+
+  /* Cellules : padding plus généreux + chiffres tabulaires */
+  table.w-full tbody td {
+    padding-top: 14px;
+    padding-bottom: 14px;
+    vertical-align: middle;
+  }
+
+  /* Chiffres alignés dans toutes les cellules */
+  table.w-full td,
+  table.w-full th {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Actions à droite : icônes plus douces */
+  table.w-full td button,
+  table.w-full td a[title] {
+    transition: all 150ms ease;
+  }
+  table.w-full td button:hover,
+  table.w-full td a[title]:hover {
+    transform: translateY(-1px);
+  }
+
+  /* tfoot pour les totaux : look bien marqué */
+  table.w-full tfoot tr {
+    background: color-mix(in oklch, var(--chargiz-teal) 5%, transparent);
+    border-top: 2px solid color-mix(in oklch, var(--chargiz-teal) 25%, transparent);
+  }
+
+  table.w-full tfoot td {
+    padding-top: 14px;
+    padding-bottom: 14px;
+    font-weight: 700;
+    color: var(--color-foreground);
   }
 }
 
