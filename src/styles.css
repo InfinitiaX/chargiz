@@ -156,6 +156,10 @@
 
   body {
     background-color: var(--color-background);
+    background-image:
+      radial-gradient(at 0% 0%, color-mix(in oklch, var(--chargiz-teal) 6%, transparent) 0%, transparent 45%),
+      radial-gradient(at 100% 100%, color-mix(in oklch, var(--chargiz-lime) 8%, transparent) 0%, transparent 50%);
+    background-attachment: fixed;
     color: var(--color-foreground);
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01", "ss03";
@@ -189,6 +193,75 @@
   ::-webkit-scrollbar-thumb:hover {
     background: color-mix(in oklch, var(--color-muted-foreground) 40%, transparent);
     background-clip: padding-box;
+  }
+}
+
+/* ============================================================
+   Composants UI personnalisés
+   ============================================================ */
+
+@layer components {
+  /* Cards avec ombre douce et lift au hover */
+  .rounded-xl.bg-card,
+  .rounded-2xl.bg-card {
+    box-shadow:
+      0 1px 2px 0 oklch(0.20 0.04 220 / 0.04),
+      0 1px 3px 0 oklch(0.20 0.04 220 / 0.06);
+    transition: box-shadow 200ms ease, transform 200ms ease;
+  }
+
+  /* KPI cards avec lift au hover */
+  [class*="rounded-xl"][class*="bg-card"][class*="hover:shadow-md"]:hover {
+    box-shadow:
+      0 4px 6px -1px oklch(0.20 0.04 220 / 0.08),
+      0 2px 4px -1px oklch(0.20 0.04 220 / 0.04),
+      0 0 0 1px color-mix(in oklch, var(--chargiz-teal) 8%, transparent);
+    transform: translateY(-1px);
+  }
+
+  /* Boutons primary avec dégradé subtil */
+  .bg-primary {
+    background-image: linear-gradient(
+      135deg,
+      var(--chargiz-teal) 0%,
+      var(--chargiz-teal-light) 100%
+    );
+    box-shadow:
+      0 1px 2px 0 color-mix(in oklch, var(--chargiz-teal) 30%, transparent),
+      inset 0 1px 0 0 oklch(1 0 0 / 0.08);
+  }
+
+  .bg-primary:hover {
+    box-shadow:
+      0 4px 12px -2px color-mix(in oklch, var(--chargiz-teal) 35%, transparent),
+      inset 0 1px 0 0 oklch(1 0 0 / 0.12);
+  }
+
+  /* Sidebar header avec subtle highlight */
+  aside.bg-sidebar {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--chargiz-teal-dark) 15%, var(--sidebar)) 0%,
+      var(--sidebar) 100%
+    );
+  }
+
+  /* Pills de fil d'Ariane / badges actifs : focus ring subtil */
+  .bg-sidebar-accent {
+    box-shadow: inset 2px 0 0 var(--chargiz-lime);
+  }
+
+  /* Inputs : focus accent plus net */
+  input:focus,
+  select:focus,
+  textarea:focus {
+    box-shadow:
+      0 0 0 3px color-mix(in oklch, var(--chargiz-teal) 15%, transparent);
+  }
+
+  /* Tables : hover row sans borders */
+  tbody tr {
+    transition: background-color 120ms ease;
   }
 }
 
