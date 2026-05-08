@@ -6,7 +6,7 @@ import CreateEntrepriseDialog from "@/components/CreateEntrepriseDialog";
 import { Plus, Search, Eye, Archive, Download } from "lucide-react";
 import { exportCSV } from "@/lib/export";
 
-export const Route = createFileRoute("/dashboard/listes/entreprises")({
+export const Route = createFileRoute("/dashboard/listes/entreprises/")({
   component: ListeEntreprises,
   head: () => ({ meta: [{ title: "ChargiZ — Entreprises" }] }),
 });
