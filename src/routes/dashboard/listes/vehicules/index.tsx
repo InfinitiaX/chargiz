@@ -6,7 +6,7 @@ import { Plus, Search, Car, Eye, Edit, Trash2, X, Download } from "lucide-react"
 import { exportCSV } from "@/lib/export";
 import { apiFetch } from "@/lib/api";
 
-export const Route = createFileRoute("/dashboard/listes/vehicules")({
+export const Route = createFileRoute("/dashboard/listes/vehicules/")({
   component: ListeVehicules,
   head: () => ({ meta: [{ title: "ChargiZ — Véhicules" }] }),
 });

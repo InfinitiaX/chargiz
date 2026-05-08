@@ -106,7 +106,7 @@ function EntrepriseDetail() {
 
       {/* KPI cards */}
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <KpiSmall icon={Users} label="Utilisateurs" value={users.length} />
+        <KpiSmall icon={ShieldCheck} label="Gestionnaires" value={users.filter((u: any) => String(u.role ?? "").startsWith("gestionnaire")).length} />
         <KpiSmall icon={Users} label="Collaborateurs" value={collabs.length} />
         <KpiSmall icon={Car} label="Véhicules" value={vehicules.length} />
         <KpiSmall icon={Zap} label="Sessions" value={stats?.nb_sessions ?? 0} />
@@ -127,39 +127,48 @@ function EntrepriseDetail() {
         </div>
       </Section>
 
-      {/* Utilisateurs */}
-      <Section title={`Utilisateurs (${users.length})`} icon={ShieldCheck}>
-        {users.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic">Aucun utilisateur.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/30 text-left">
-                  <th className="px-4 py-2 font-medium text-muted-foreground">Nom</th>
-                  <th className="px-4 py-2 font-medium text-muted-foreground">Email</th>
-                  <th className="px-4 py-2 font-medium text-muted-foreground">Rôle</th>
-                  <th className="px-4 py-2 font-medium text-muted-foreground">Actif</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u: any) => (
-                  <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-2 font-medium">{u.full_name ?? "—"}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{u.email}</td>
-                    <td className="px-4 py-2">
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize">
-                        {String(u.role ?? "").replace(/_/g, " ")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">{u.is_active ? "✓" : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Section>
+      {/* Gestionnaires de l'entreprise */}
+      {(() => {
+        const gestionnaires = users.filter((u: any) =>
+          u.role === "gestionnaire_entreprise" ||
+          u.role === "gestionnaire_filiale" ||
+          u.role === "gestionnaire_site"
+        );
+        return (
+          <Section title={`Gestionnaire${gestionnaires.length > 1 ? "s" : ""} (${gestionnaires.length})`} icon={ShieldCheck}>
+            {gestionnaires.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">Aucun gestionnaire affecté à cette entreprise.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30 text-left">
+                      <th className="px-4 py-2 font-medium text-muted-foreground">Nom</th>
+                      <th className="px-4 py-2 font-medium text-muted-foreground">Email</th>
+                      <th className="px-4 py-2 font-medium text-muted-foreground">Rôle</th>
+                      <th className="px-4 py-2 font-medium text-muted-foreground">Actif</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gestionnaires.map((u: any) => (
+                      <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                        <td className="px-4 py-2 font-medium">{u.full_name ?? "—"}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{u.email}</td>
+                        <td className="px-4 py-2">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize">
+                            {String(u.role ?? "").replace(/_/g, " ")}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">{u.is_active ? "✓" : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
+        );
+      })()}
 
       {/* Collaborateurs */}
       <Section title={`Collaborateurs (${collabs.length})`} icon={Users}>
