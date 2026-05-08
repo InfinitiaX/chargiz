@@ -304,6 +304,32 @@ function MesInfosPage() {
           ) : (
             <p className="text-sm text-muted-foreground">Aucun véhicule affecté.</p>
           )}
+
+          {/* Bouton "Connecter via Smartcar" si véhicule absent OU non connecté */}
+          {user?.role === "collaborateur" && (!vehicule || vehicule.statut_smartcar !== "connecte") && (
+            <div className="mt-6 pt-6 border-t border-border">
+              <p className="text-sm text-muted-foreground mb-3">
+                {!vehicule
+                  ? "Vous n'avez pas encore connecté de véhicule."
+                  : "Votre véhicule n'est plus connecté à Smartcar."}
+                {" Cliquez ci-dessous pour démarrer la connexion."}
+              </p>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await api.me.smartcarConnectUrl();
+                    window.location.href = res.smartcar_auth_url;
+                  } catch (e: any) {
+                    alert("Erreur : " + (e.message ?? "inconnue"));
+                  }
+                }}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light"
+              >
+                <Car className="h-4 w-4" />
+                Connecter mon véhicule via Smartcar
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -172,6 +172,9 @@ export const api = {
     get: (id: string) => apiFetch<any>(`/api/vehicules/${id}`),
     update: (id: string, data: any) => apiFetch<any>(`/api/vehicules/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   },
+  me: {
+    smartcarConnectUrl: () => apiFetch<{ smartcar_auth_url: string }>(`/api/me/smartcar/connect-url`),
+  },
   sessions: {
     list: (params?: Record<string, string>) => {
       const qs = new URLSearchParams(params).toString();
