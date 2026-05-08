@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Car, User, Calendar, Zap, Gauge, ShieldCheck, History } from "lucide-react";
+import { ArrowLeft, Car, User, Calendar, Zap, Gauge, ShieldCheck, History, Building2, ChevronRight } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/dashboard/listes/vehicules/$vehiculeId")({
   component: FicheVehicule,
@@ -25,6 +26,12 @@ interface Collaborateur {
   id: string;
   nom: string;
   prenom: string;
+  email: string;
+}
+
+interface Entreprise {
+  id: string;
+  nom: string;
 }
 
 interface Session {
@@ -38,8 +45,11 @@ interface Session {
 
 function FicheVehicule() {
   const { vehiculeId } = Route.useParams();
+  const { role } = useAuth();
+  const isSuperadmin = role === "superadmin";
   const [vehicule, setVehicule] = useState<Vehicule | null>(null);
   const [collab, setCollab] = useState<Collaborateur | null>(null);
+  const [entreprise, setEntreprise] = useState<Entreprise | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,13 +63,22 @@ function FicheVehicule() {
       const v = await apiFetch<Vehicule>(`/api/vehicules/${vehiculeId}`);
       setVehicule(v);
 
-      if (v.collaborateur_id) {
-        const c = await apiFetch<Collaborateur>(`/api/collaborateurs/${v.collaborateur_id}`);
-        setCollab(c);
+      // Hiérarchie : entreprise → collaborateur → véhicule
+      const fetches: Promise<any>[] = [];
+      if (v.entreprise_id) {
+        fetches.push(
+          apiFetch<Entreprise>(`/api/entreprises/${v.entreprise_id}`).then(setEntreprise).catch(() => {})
+        );
       }
-
-      const ss = await apiFetch<Session[]>(`/api/sessions?vehicule_id=${vehiculeId}`);
-      setSessions(ss);
+      if (v.collaborateur_id) {
+        fetches.push(
+          apiFetch<Collaborateur>(`/api/collaborateurs/${v.collaborateur_id}`).then(setCollab).catch(() => {})
+        );
+      }
+      fetches.push(
+        apiFetch<Session[]>(`/api/sessions?vehicule_id=${vehiculeId}`).then(setSessions).catch(() => {})
+      );
+      await Promise.all(fetches);
     } catch (err) {
       console.error("Error loading vehicle details:", err);
     } finally {
@@ -83,6 +102,51 @@ function FicheVehicule() {
         <Link to="/dashboard/listes/vehicules" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Retour aux véhicules
         </Link>
+      </div>
+
+      {/* Fil d'Ariane : Entreprise → Collaborateur → Véhicule */}
+      <div className="mb-6 flex items-center gap-2 flex-wrap text-sm">
+        {/* Entreprise */}
+        {entreprise ? (
+          <Link
+            to={isSuperadmin ? "/dashboard/listes/entreprises/$id" : "/dashboard/listes/entreprises"}
+            params={isSuperadmin ? { id: entreprise.id } : undefined}
+            className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 hover:border-primary hover:text-primary transition-colors"
+          >
+            <Building2 className="h-3.5 w-3.5" />
+            <span className="font-medium">{entreprise.nom}</span>
+          </Link>
+        ) : (
+          <span className="flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1.5 text-muted-foreground">
+            <Building2 className="h-3.5 w-3.5" /> <span className="text-xs italic">Sans entreprise</span>
+          </span>
+        )}
+
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+
+        {/* Collaborateur */}
+        {collab ? (
+          <Link
+            to="/dashboard/collaborateur/$id"
+            params={{ id: collab.id }}
+            className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 hover:border-primary hover:text-primary transition-colors"
+          >
+            <User className="h-3.5 w-3.5" />
+            <span className="font-medium">{collab.prenom} {collab.nom}</span>
+          </Link>
+        ) : (
+          <span className="flex items-center gap-1.5 rounded-full border border-dashed border-border bg-muted px-3 py-1.5 text-muted-foreground">
+            <User className="h-3.5 w-3.5" /> <span className="text-xs italic">Aucun collaborateur affilié</span>
+          </span>
+        )}
+
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+
+        {/* Véhicule (current) */}
+        <span className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-primary-foreground">
+          <Car className="h-3.5 w-3.5" />
+          <span className="font-medium">{vehicule.marque} {vehicule.modele}</span>
+        </span>
       </div>
 
       <div className="mb-8 flex items-center gap-4">
