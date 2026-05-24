@@ -3,6 +3,7 @@ import { API_URL, TOKEN_STORAGE_KEY, apiFetch } from "@/lib/api";
 
 export type AppRole =
   | "superadmin"
+  | "admin"
   | "gestionnaire_entreprise"
   | "gestionnaire_filiale"
   | "gestionnaire_site"
@@ -39,6 +40,7 @@ interface AuthUser {
   filiale_id: string | null;
   site_id: string | null;
   is_active: boolean;
+  password_change_required?: boolean;  // BugID_001
 }
 
 interface AuthSession {
@@ -173,6 +175,24 @@ export function useAuth() {
     setSession(authSession);
     setRole(currentUser.role);
     setProfile(nextProfile);
+
+    return { user: currentUser, session: authSession };
+  };
+
+  /** Recharge le user courant depuis le backend (utile après changement de mot de passe). */
+  const refresh = async () => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) return;
+    try {
+      const currentUser = await apiFetch<AuthUser>("/api/auth/me");
+      const nextProfile = buildProfile(currentUser);
+      cache.user = currentUser;
+      cache.role = currentUser.role;
+      cache.profile = nextProfile;
+      setUser(currentUser);
+      setRole(currentUser.role);
+      setProfile(nextProfile);
+    } catch {/* ignore */}
   };
 
   const signOut = async () => {
@@ -196,7 +216,7 @@ export function useAuth() {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
     if (!token) throw new Error("Non authentifié");
 
-    const response = await fetch(`${API_URL}/auth/change-password`, {
+    const response = await fetch(`${API_URL}/api/auth/change-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -260,6 +280,7 @@ export function useAuth() {
     signOut,
     resetPassword,
     updatePassword,
+    refresh,
     canManage,
     isAtLeast,
   };

@@ -1,4 +1,5 @@
 import { Outlet, Link, createRootRoute } from "@tanstack/react-router";
+import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -46,5 +47,21 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      <Toaster
+        position="bottom-right"
+        richColors
+        toastOptions={{
+          duration: 6000,
+          classNames: {
+            toast: "!rounded-xl !shadow-xl !border",
+            title: "!font-semibold !text-sm",
+            description: "!text-xs !leading-relaxed",
+          },
+        }}
+      />
+    </>
+  );
 }

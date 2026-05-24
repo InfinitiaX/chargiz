@@ -27,6 +27,24 @@ interface NavItem {
   label: string;
 }
 
+function getInitials(prenom?: string, nom?: string): string {
+  const p = (prenom || "").trim()[0] || "";
+  const n = (nom || "").trim()[0] || "";
+  return (p + n).toUpperCase() || "U";
+}
+
+/** Horloge live affichée dans le footer de la sidebar (rafraîchit toutes les 30s) */
+function LiveClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  return <span className="font-mono tabular-nums">{hh}:{mm}</span>;
+}
+
 export default function DashboardSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -51,25 +69,84 @@ export default function DashboardSidebar() {
 
   const isCollab = role === "collaborateur";
 
-  // Lot 1 scope: Superadmin + Gestionnaire entreprise.
-  // Filiales/Sites menus and gestionnaire_filiale/site role gating are deferred to Lot 2 (CDC §6.2).
+  // Périmètre par rôle (CDC §1.2 + §6.2 — Lot 2 Étape 1/2/3)
   const getListesItems = (): NavItem[] => {
     const items: NavItem[] = [];
-    if (role === "superadmin") {
+    // Entreprises : superadmin (toutes) + admin (celles attribuées)
+    if (role === "superadmin" || role === "admin") {
       items.push({ to: "/dashboard/listes/entreprises", icon: Building2, label: "Entreprises" });
     }
-    // [Lot 2] Filiales menu — hidden until Lot 2.
-    // if (role === "superadmin" || role === "gestionnaire_entreprise" || role === "gestionnaire_filiale") {
-    //   items.push({ to: "/dashboard/listes/filiales", icon: Building2, label: "Filiales" });
-    // }
-    // [Lot 2] Sites menu — hidden until Lot 2.
-    // if (role === "superadmin" || role === "gestionnaire_entreprise" ||
-    //     role === "gestionnaire_filiale" || role === "gestionnaire_site") {
-    //   items.push({ to: "/dashboard/listes/sites", icon: MapPin, label: "Sites" });
-    // }
+    if (role === "superadmin" || role === "admin" || role === "gestionnaire_entreprise" || role === "gestionnaire_filiale") {
+      items.push({ to: "/dashboard/listes/filiales", icon: Building2, label: "Filiales" });
+    }
+    if (role === "superadmin" || role === "admin" || role === "gestionnaire_entreprise" ||
+        role === "gestionnaire_filiale" || role === "gestionnaire_site") {
+      items.push({ to: "/dashboard/listes/sites", icon: MapPin, label: "Sites" });
+    }
     items.push({ to: "/dashboard/listes/vehicules", icon: Car, label: "Véhicules" });
     items.push({ to: "/dashboard/listes/collaborateurs", icon: Users, label: "Collaborateurs" });
     return items;
+  };
+
+  // Classe partagée des items de nav (avec animations CSS sidebar-link / sidebar-icon)
+  const linkBase =
+    "sidebar-link flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-semibold tracking-tight";
+  const linkActive = "bg-sidebar-accent text-sidebar-primary sidebar-link-active";
+  const linkIdle =
+    "text-sidebar-foreground/75 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground";
+
+  /** Bloc identité : avatar gradient + nom + rôle + point vert "live" */
+  const renderProfileBlock = () => {
+    if (!profile) return null;
+    const initials = getInitials(profile.prenom, profile.nom);
+    return (
+      <div className="border-b border-sidebar-border/60 px-4 py-4">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-sidebar-primary-foreground shadow-sm"
+              style={{
+                backgroundImage:
+                  "linear-gradient(135deg, var(--chargiz-lime) 0%, var(--chargiz-lime-dark) 100%)",
+              }}
+            >
+              {initials}
+            </div>
+            <span
+              aria-label="En ligne"
+              className="sidebar-live-dot absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-sidebar"
+              style={{ background: "var(--chargiz-lime)" }}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-sidebar-foreground">
+              {profile.prenom} {profile.nom}
+            </p>
+            <p className="truncate text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/55">
+              {role?.replace(/_/g, " ") || "—"}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  /** Footer dynamique : statut système + heure live */
+  const renderStatusFooter = () => {
+    return (
+      <div className="border-t border-sidebar-border/60 px-4 py-3">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-sidebar-foreground/45">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="sidebar-live-dot h-1.5 w-1.5 rounded-full"
+              style={{ background: "var(--chargiz-lime)" }}
+            />
+            Système OK
+          </span>
+          <LiveClock />
+        </div>
+      </div>
+    );
   };
 
   const renderSidebarContent = () => {
@@ -83,38 +160,33 @@ export default function DashboardSidebar() {
 
       return (
         <>
-          <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-6">
+          <div className="flex h-16 items-center justify-center border-b border-sidebar-border/60 px-6">
             <img src={logoChargiz} alt="ChargiZ" className="h-7 w-auto" />
           </div>
-          {profile && (
-            <div className="border-b border-sidebar-border px-4 py-3">
-              <p className="text-sm font-bold text-sidebar-foreground">{profile.prenom} {profile.nom}</p>
-              <p className="text-xs text-sidebar-foreground/60 capitalize">{role?.replace(/_/g, " ") || "—"}</p>
-            </div>
-          )}
+          {renderProfileBlock()}
           <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-6">
             {collabNav.map((item) => {
               const isActive = item.to === "/dashboard"
                 ? location.pathname === "/dashboard"
                 : location.pathname.startsWith(item.to);
               return (
-                <Link key={item.to} to={item.to}
-                  className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-                    isActive ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                  }`}>
-                  <item.icon className="h-5 w-5" />
+                <Link key={item.to} to={item.to} className={`${linkBase} ${isActive ? linkActive : linkIdle}`}>
+                  <item.icon className="sidebar-icon h-5 w-5" />
                   {item.label}
                 </Link>
               );
             })}
           </nav>
-          <div className="border-t border-sidebar-border p-4">
-            <button onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground">
-              <LogOut className="h-5 w-5" />
+          <div className="border-t border-sidebar-border/60 p-3">
+            <button
+              onClick={handleLogout}
+              className={`${linkBase} w-full text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground`}
+            >
+              <LogOut className="sidebar-icon h-5 w-5" />
               Déconnexion
             </button>
           </div>
+          {renderStatusFooter()}
         </>
       );
     }
@@ -124,39 +196,34 @@ export default function DashboardSidebar() {
 
     return (
       <>
-        <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-6">
+        <div className="flex h-16 items-center justify-center border-b border-sidebar-border/60 px-6">
           <img src={logoChargiz} alt="ChargiZ" className="h-7 w-auto" />
         </div>
 
-        {profile && (
-          <div className="border-b border-sidebar-border px-4 py-3">
-            <p className="text-sm font-bold text-sidebar-foreground">{profile.prenom} {profile.nom}</p>
-            <p className="text-xs text-sidebar-foreground/60 capitalize">{role?.replace(/_/g, " ") || "—"}</p>
-          </div>
-        )}
+        {renderProfileBlock()}
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-6">
-          <Link to="/dashboard"
-            className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-              location.pathname === "/dashboard" ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-            }`}>
-            <LayoutDashboard className="h-5 w-5" />
+          <Link
+            to="/dashboard"
+            className={`${linkBase} ${location.pathname === "/dashboard" ? linkActive : linkIdle}`}
+          >
+            <LayoutDashboard className="sidebar-icon h-5 w-5" />
             Dashboard
           </Link>
 
-          <Link to="/dashboard/statistiques"
-            className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-              location.pathname.startsWith("/dashboard/statistiques") ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-            }`}>
-            <BarChart3 className="h-5 w-5" />
+          <Link
+            to="/dashboard/statistiques"
+            className={`${linkBase} ${location.pathname.startsWith("/dashboard/statistiques") ? linkActive : linkIdle}`}
+          >
+            <BarChart3 className="sidebar-icon h-5 w-5" />
             Statistiques
           </Link>
 
-          <button onClick={() => setListesOpen(!listesOpen)}
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-              isListeActive ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-            }`}>
-            <List className="h-5 w-5" />
+          <button
+            onClick={() => setListesOpen(!listesOpen)}
+            className={`${linkBase} w-full ${isListeActive ? linkActive : linkIdle}`}
+          >
+            <List className="sidebar-icon h-5 w-5" />
             Listes
             {listesOpen ? <ChevronDown className="ml-auto h-4 w-4" /> : <ChevronRight className="ml-auto h-4 w-4" />}
           </button>
@@ -165,11 +232,14 @@ export default function DashboardSidebar() {
               {listesItems.map((item) => {
                 const isActive = location.pathname.startsWith(item.to);
                 return (
-                  <Link key={item.to} to={item.to}
-                    className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
-                      isActive ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                    }`}>
-                    <item.icon className="h-4 w-4" />
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={`sidebar-link flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-semibold tracking-tight ${
+                      isActive ? linkActive : "text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground"
+                    }`}
+                  >
+                    <item.icon className="sidebar-icon h-4 w-4" />
                     {item.label}
                   </Link>
                 );
@@ -177,32 +247,35 @@ export default function DashboardSidebar() {
             </div>
           )}
 
-          {(role === "superadmin" || role === "gestionnaire_entreprise") && (
-            <Link to="/dashboard/administration"
-              className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-                location.pathname.startsWith("/dashboard/administration") ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-              }`}>
-              <ShieldCheck className="h-5 w-5" />
+          {(role === "superadmin" || role === "admin" || role === "gestionnaire_entreprise") && (
+            <Link
+              to="/dashboard/administration"
+              className={`${linkBase} ${location.pathname.startsWith("/dashboard/administration") ? linkActive : linkIdle}`}
+            >
+              <ShieldCheck className="sidebar-icon h-5 w-5" />
               Administration
             </Link>
           )}
 
-          <Link to="/dashboard/reglages"
-            className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-              location.pathname.startsWith("/dashboard/reglages") ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-            }`}>
-            <Settings className="h-5 w-5" />
+          <Link
+            to="/dashboard/reglages"
+            className={`${linkBase} ${location.pathname.startsWith("/dashboard/reglages") ? linkActive : linkIdle}`}
+          >
+            <Settings className="sidebar-icon h-5 w-5" />
             Réglages
           </Link>
         </nav>
 
-        <div className="border-t border-sidebar-border p-4">
-          <button onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground">
-            <LogOut className="h-5 w-5" />
+        <div className="border-t border-sidebar-border/60 p-3">
+          <button
+            onClick={handleLogout}
+            className={`${linkBase} w-full text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground`}
+          >
+            <LogOut className="sidebar-icon h-5 w-5" />
             Déconnexion
           </button>
         </div>
+        {renderStatusFooter()}
       </>
     );
   };
@@ -220,7 +293,7 @@ export default function DashboardSidebar() {
               <Menu className="h-6 w-6" />
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-64 border-r-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground">
+          <SheetContent side="left" className="sidebar-bg-gradient w-64 border-r-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground">
             <div className="flex h-full flex-col">
               {renderSidebarContent()}
             </div>
@@ -231,7 +304,7 @@ export default function DashboardSidebar() {
       </div>
 
       {/* Desktop fixed sidebar */}
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col bg-sidebar text-sidebar-foreground md:flex">
+      <aside className="sidebar-bg-gradient fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col bg-sidebar text-sidebar-foreground md:flex">
         {renderSidebarContent()}
       </aside>
     </>

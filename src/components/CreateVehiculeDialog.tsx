@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { X, Car, ShieldCheck, Zap } from "lucide-react";
+import { X, Car, ShieldCheck } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import VehiculeSelector, { type VehiculeSelectorValue } from "@/components/VehiculeSelector";
 
 interface Props {
   entrepriseId: string;
@@ -9,20 +10,25 @@ interface Props {
   onCreated: () => void;
 }
 
+// Normalise l'immatriculation (CDC §5.1.1.2 — majuscules, lettres/chiffres uniquement)
+function normalizeImmat(raw: string): string {
+  return raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
 export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCreated }: Props) {
   const [loading, setLoading] = useState(false);
   const [collabs, setCollabs] = useState<{ id: string; nom: string; prenom: string }[]>([]);
+  const [vehSelector, setVehSelector] = useState<VehiculeSelectorValue>({ marque: "", modele: "", capacite_batterie: null });
   const [form, setForm] = useState({
-    marque: "",
-    modele: "",
     immatriculation: "",
     vin: "",
-    capacite_batterie: "",
     collaborateur_id: "",
   });
 
   useEffect(() => {
     if (open) {
+      setVehSelector({ marque: "", modele: "", capacite_batterie: null });
+      setForm({ immatriculation: "", vin: "", collaborateur_id: "" });
       apiFetch<{ id: string; nom: string; prenom: string }[]>(`/api/collaborateurs?entreprise_id=${entrepriseId}&active_only=true`)
         .then(setCollabs)
         .catch(console.error);
@@ -33,24 +39,24 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!vehSelector.marque.trim() || !vehSelector.modele.trim()) return;
     setLoading(true);
     try {
       await apiFetch("/api/vehicules", {
         method: "POST",
         body: JSON.stringify({
           entreprise_id: entrepriseId,
-          marque: form.marque || null,
-          modele: form.modele || null,
+          marque: vehSelector.marque || null,
+          modele: vehSelector.modele || null,
           immatriculation: form.immatriculation || null,
           vin: form.vin || null,
-          capacite_batterie: form.capacite_batterie ? parseFloat(form.capacite_batterie) : null,
+          capacite_batterie: vehSelector.capacite_batterie,
           collaborateur_id: form.collaborateur_id || null,
           statut_affectation: form.collaborateur_id ? "affecte" : "non_affecte",
         }),
       });
       onCreated();
       onClose();
-      setForm({ marque: "", modele: "", immatriculation: "", vin: "", capacite_batterie: "", collaborateur_id: "" });
     } catch (err) {
       console.error("Erreur création véhicule:", err);
     } finally {
@@ -76,33 +82,25 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium text-foreground">Marque *</label>
-              <input required className={inputCls} value={form.marque} onChange={e => setForm(f => ({ ...f, marque: e.target.value }))} placeholder="Ex: Tesla" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">Modèle *</label>
-              <input required className={inputCls} value={form.modele} onChange={e => setForm(f => ({ ...f, modele: e.target.value }))} placeholder="Ex: Model 3" />
-            </div>
-          </div>
+          {/* Sélecteur véhicule depuis base EV (marque/modèle/capacité) */}
+          <VehiculeSelector value={vehSelector} onChange={setVehSelector} required />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium text-foreground">Immatriculation</label>
-              <input className={inputCls} value={form.immatriculation} onChange={e => setForm(f => ({ ...f, immatriculation: e.target.value }))} placeholder="AA-123-BB" />
+              <input
+                className={`${inputCls} font-mono uppercase tracking-wide`}
+                value={form.immatriculation}
+                onChange={e => setForm(f => ({ ...f, immatriculation: normalizeImmat(e.target.value) }))}
+                placeholder="AB123CD"
+                maxLength={10}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">Lettres/chiffres — auto-formaté</p>
             </div>
             <div>
               <label className="text-sm font-medium text-foreground">VIN</label>
-              <input className={inputCls} value={form.vin} onChange={e => setForm(f => ({ ...f, vin: e.target.value }))} placeholder="17 caractères" />
+              <input className={inputCls} value={form.vin} onChange={e => setForm(f => ({ ...f, vin: e.target.value }))} placeholder="17 caractères (auto via Smartcar)" />
             </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-foreground flex items-center gap-1">
-              <Zap className="h-3 w-3 text-yellow-500" /> Capacité batterie (kWh)
-            </label>
-            <input type="number" step="0.1" className={inputCls} value={form.capacite_batterie} onChange={e => setForm(f => ({ ...f, capacite_batterie: e.target.value }))} placeholder="Ex: 60" />
           </div>
 
           <div className="border-t border-border pt-4">
@@ -122,7 +120,11 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
             <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
               Annuler
             </button>
-            <button type="submit" disabled={loading} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50">
+            <button
+              type="submit"
+              disabled={loading || !vehSelector.marque.trim() || !vehSelector.modele.trim()}
+              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50"
+            >
               {loading ? "Création..." : "Ajouter au parc"}
             </button>
           </div>

@@ -1,155 +1,160 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
-import { Car, MapPin, User, ChevronRight, Loader2, AlertCircle, CheckCircle2, Search, Navigation } from "lucide-react";
+import { Car, ChevronRight, ChevronLeft, Loader2, AlertCircle, CheckCircle2, MapPin, User as UserIcon } from "lucide-react";
+import VehiculeSelector, { type VehiculeSelectorValue } from "@/components/VehiculeSelector";
+import AddressAutocomplete, { type AddressValue } from "@/components/AddressAutocomplete";
+import MapPinPicker from "@/components/MapPinPicker";
 
 export const Route = createFileRoute("/onboarding/$token")({
   component: OnboardingPage,
   head: () => ({
     meta: [
       { title: "ChargiZ — Finalisation inscription" },
-      { name: "description", content: "Finalisez votre inscription ChargiZ." },
+      { name: "description", content: "Renseignez votre véhicule et connectez-le pour activer votre compte ChargiZ." },
     ],
   }),
 });
 
-type Step = "profile" | "home" | "smartcar";
+interface OnboardingData {
+  full_name: string;
+  email: string;
+  collaborateur_id: string;
+  smartcar_auth_url: string;
+  vehicule: null | {
+    marque: string;
+    modele: string;
+    immatriculation: string;
+    capacite_batterie: number | null;
+    smartcar_connected: boolean;
+  };
+}
 
-async function nominatimSearch(query: string): Promise<{ display_name: string; lat: string; lon: string } | null> {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`,
-      { headers: { "Accept-Language": "fr" } }
-    );
-    const data = await res.json();
-    return data[0] ?? null;
-  } catch {
-    return null;
-  }
+type Step = "profil" | "adresse" | "vehicule";
+
+function normalizeImmat(raw: string): string {
+  return raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
 function OnboardingPage() {
   const { token } = Route.useParams();
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [data, setData] = useState<OnboardingData | null>(null);
   const [error, setError] = useState("");
-  const [step, setStep] = useState<Step>("profile");
+  const [step, setStep] = useState<Step>("profil");
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
-  // Step 1 — profile
-  const [nom, setNom] = useState("");
-  const [prenom, setPrenom] = useState("");
-  const [telephone, setTelephone] = useState("");
-  const [savingProfile, setSavingProfile] = useState(false);
-
-  // Step 2 — home
-  const [addressInput, setAddressInput] = useState("");
-  const [searchResult, setSearchResult] = useState<{ display_name: string; lat: number; lon: number } | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [homeSet, setHomeSet] = useState(false);
-  const [homeAddress, setHomeAddress] = useState("");
-  const [savingHome, setSavingHome] = useState(false);
-  const [homeSkipped, setHomeSkipped] = useState(false);
+  // ─── Données de chaque étape ────────────────────────────────────────────
+  const [profil, setProfil] = useState({ telephone: "", pays_code: "FR" });
+  const [adresse, setAdresse] = useState<AddressValue>({
+    pays_code: "FR", adresse: "", code_postal: "", ville: "",
+    latitude: null, longitude: null,
+  });
+  const [pointRechargeDistant, setPointRechargeDistant] = useState<"non" | "oui">("non");
+  const [pointRecharge, setPointRecharge] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
+  const [vehicule, setVehicule] = useState<VehiculeSelectorValue>({ marque: "", modele: "", capacite_batterie: null });
+  const [immat, setImmat] = useState("");
 
   useEffect(() => {
-    apiFetch<any>(`/api/onboarding/${token}`)
-      .then(data => {
-        setUser(data);
-        const parts = (data.full_name || "").split(" ");
-        setPrenom(parts[0] || "");
-        setNom(parts.slice(1).join(" ") || "");
+    apiFetch<OnboardingData>(`/api/onboarding/${token}`)
+      .then(d => {
+        setData(d);
+        if (d.vehicule) {
+          setVehicule({
+            marque: d.vehicule.marque || "",
+            modele: d.vehicule.modele || "",
+            capacite_batterie: d.vehicule.capacite_batterie,
+          });
+          setImmat(d.vehicule.immatriculation || "");
+        }
         setLoading(false);
       })
-      .catch(() => {
-        setError("Ce lien de finalisation est invalide ou a expiré.");
-        setLoading(false);
-      });
+      .catch(() => { setError("Ce lien de finalisation est invalide ou a expiré."); setLoading(false); });
   }, [token]);
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
-
-  const handleSaveProfile = async () => {
-    if (!nom.trim() || !prenom.trim()) return;
-    setSavingProfile(true);
+  // ─── Soumission de chaque étape ─────────────────────────────────────────
+  const saveProfil = async () => {
+    if (!profil.telephone.trim()) { setFormError("Le téléphone est requis."); return false; }
+    if (!/^(\+\d{1,3})?[\s\d]{6,}$/.test(profil.telephone)) { setFormError("Numéro invalide."); return false; }
+    setSaving(true); setFormError("");
     try {
       await apiFetch(`/api/onboarding/${token}/profile`, {
         method: "PATCH",
-        body: JSON.stringify({ nom: nom.trim(), prenom: prenom.trim(), telephone: telephone.trim() || null }),
+        body: JSON.stringify({ telephone: profil.telephone, pays_code: profil.pays_code }),
       });
-      setStep("home");
-    } catch (e: any) {
-      alert("Erreur : " + (e.message ?? "inconnue"));
-    } finally {
-      setSavingProfile(false);
-    }
+      return true;
+    } catch (err: any) {
+      setFormError(err.message || "Erreur lors de la sauvegarde du profil.");
+      return false;
+    } finally { setSaving(false); }
   };
 
-  const saveHome = async (lat: number, lon: number, address: string) => {
-    setSavingHome(true);
+  const saveAdresse = async () => {
+    if (!adresse.adresse.trim() || !adresse.code_postal.trim() || !adresse.ville.trim()) {
+      setFormError("Adresse complète requise."); return false;
+    }
+    setSaving(true); setFormError("");
     try {
+      // Si point de recharge distant, on utilise ses coordonnées comme home_lat/lng
+      const useDistantPoint = pointRechargeDistant === "oui" && pointRecharge.lat != null && pointRecharge.lng != null;
       await apiFetch(`/api/onboarding/${token}/home`, {
         method: "PATCH",
-        body: JSON.stringify({ latitude: lat, longitude: lon, address }),
+        body: JSON.stringify({
+          latitude: useDistantPoint ? pointRecharge.lat : adresse.latitude,
+          longitude: useDistantPoint ? pointRecharge.lng : adresse.longitude,
+          address: `${adresse.adresse}, ${adresse.code_postal} ${adresse.ville}`,
+        }),
       });
-      setHomeSet(true);
-      setHomeAddress(address);
-    } catch (e: any) {
-      alert("Erreur lors de l'enregistrement du domicile : " + (e.message ?? "inconnue"));
-    } finally {
-      setSavingHome(false);
+      return true;
+    } catch (err: any) {
+      setFormError(err.message || "Erreur lors de la sauvegarde de l'adresse.");
+      return false;
+    } finally { setSaving(false); }
+  };
+
+  const saveVehicule = async () => {
+    if (!vehicule.marque.trim() || !vehicule.modele.trim() || !immat.trim()) {
+      setFormError("Marque, modèle et immatriculation sont obligatoires."); return false;
+    }
+    setSaving(true); setFormError("");
+    try {
+      const res = await apiFetch<{ smartcar_auth_url: string }>(`/api/onboarding/${token}/vehicule`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          marque: vehicule.marque,
+          modele: vehicule.modele,
+          immatriculation: immat,
+          capacite_batterie: vehicule.capacite_batterie,
+        }),
+      });
+      // Redirection vers Smartcar pour finaliser (CDC §3.6.2)
+      window.location.href = res.smartcar_auth_url;
+      return true;
+    } catch (err: any) {
+      setFormError(err.message || "Erreur lors de la sauvegarde du véhicule.");
+      setSaving(false);
+      return false;
     }
   };
 
-  const handleGPS = () => {
-    if (!navigator.geolocation) {
-      alert("Géolocalisation non supportée par votre navigateur.");
-      return;
+  // ─── Navigation ─────────────────────────────────────────────────────────
+  const nextStep = async () => {
+    if (step === "profil") {
+      if (await saveProfil()) setStep("adresse");
+    } else if (step === "adresse") {
+      if (await saveAdresse()) setStep("vehicule");
+    } else if (step === "vehicule") {
+      await saveVehicule();  // ← redirige vers Smartcar
     }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        setLocating(false);
-        // Reverse geocode via Nominatim
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`,
-            { headers: { "Accept-Language": "fr" } }
-          );
-          const data = await res.json();
-          const address = data.display_name ?? `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
-          await saveHome(pos.coords.latitude, pos.coords.longitude, address);
-        } catch {
-          await saveHome(pos.coords.latitude, pos.coords.longitude, `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
-        }
-      },
-      err => {
-        setLocating(false);
-        alert("Impossible de récupérer votre position : " + err.message);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+  };
+  const prevStep = () => {
+    setFormError("");
+    if (step === "adresse") setStep("profil");
+    else if (step === "vehicule") setStep("adresse");
   };
 
-  const handleAddressSearch = async () => {
-    if (!addressInput.trim()) return;
-    setSearching(true);
-    setSearchResult(null);
-    const result = await nominatimSearch(addressInput.trim());
-    setSearching(false);
-    if (!result) {
-      alert("Adresse non trouvée. Essayez d'être plus précis (ex: 12 rue des Lilas, Paris).");
-      return;
-    }
-    setSearchResult({ display_name: result.display_name, lat: parseFloat(result.lat), lon: parseFloat(result.lon) });
-  };
-
-  const handleConfirmAddress = async () => {
-    if (!searchResult) return;
-    await saveHome(searchResult.lat, searchResult.lon, searchResult.display_name);
-  };
-
-  // ── Loading / Error ────────────────────────────────────────────────────────
-
+  // ─── Loading / Error / Already connected ────────────────────────────────
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -158,7 +163,7 @@ function OnboardingPage() {
     );
   }
 
-  if (error) {
+  if (error || !data) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="w-full max-w-md text-center">
@@ -166,263 +171,245 @@ function OnboardingPage() {
             <AlertCircle className="h-6 w-6" />
           </div>
           <h1 className="text-xl font-bold text-foreground">Lien invalide</h1>
-          <p className="mt-2 text-muted-foreground">{error}</p>
+          <p className="mt-2 text-muted-foreground">{error || "Une erreur est survenue."}</p>
+          <a href="/" className="mt-6 inline-block text-primary hover:underline">Retour à l'accueil</a>
         </div>
       </div>
     );
   }
 
-  const steps: { id: Step; label: string; icon: typeof User }[] = [
-    { id: "profile", label: "Mes infos", icon: User },
-    { id: "home", label: "Mon domicile", icon: MapPin },
-    { id: "smartcar", label: "Mon véhicule", icon: Car },
+  const prenom = (data.full_name || "").split(" ")[0] || "Bienvenue";
+
+  // Véhicule déjà connecté → message de succès
+  if (data.vehicule?.smartcar_connected) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md text-center">
+          <div className="mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-chargiz-teal/10 text-chargiz-teal">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">Votre véhicule est connecté</h1>
+          <p className="mt-2 text-muted-foreground">Vous pouvez maintenant accéder à votre espace ChargiZ.</p>
+          <a href="/" className="mt-6 inline-block rounded-lg bg-primary px-6 py-3 text-sm font-bold text-primary-foreground hover:bg-chargiz-teal-light">
+            Accéder à mon espace
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Affichage par étape ─────────────────────────────────────────────────
+  const steps: { key: Step; label: string; icon: React.ElementType }[] = [
+    { key: "profil", label: "Profil", icon: UserIcon },
+    { key: "adresse", label: "Adresse", icon: MapPin },
+    { key: "vehicule", label: "Véhicule", icon: Car },
   ];
-
-  const stepIndex = steps.findIndex(s => s.id === step);
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const currentIndex = steps.findIndex(s => s.key === step);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4 sm:p-6 lg:p-8">
-      <div className="w-full max-w-lg space-y-6">
-
+      <div className="w-full max-w-2xl space-y-6">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mb-4 border border-primary/10">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mb-4 shadow-sm border border-primary/10">
             <Car className="h-7 w-7 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Bienvenue, <span className="text-primary">{prenom || user.full_name}</span>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            Bienvenue, <span className="text-primary">{prenom}</span>
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">Finalisez votre inscription en 3 étapes</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Finalisez votre inscription en 3 étapes pour connecter votre véhicule.
+          </p>
         </div>
 
         {/* Stepper */}
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-between">
           {steps.map((s, i) => {
-            const done = i < stepIndex;
-            const active = i === stepIndex;
+            const Icon = s.icon;
+            const active = i === currentIndex;
+            const done = i < currentIndex;
             return (
-              <div key={s.id} className="flex items-center gap-2">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all ${
-                  done ? "bg-primary text-primary-foreground" :
-                  active ? "bg-primary/20 text-primary ring-2 ring-primary/40" :
-                  "bg-muted text-muted-foreground"
-                }`}>
-                  {done ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
+              <div key={s.key} className="flex items-center flex-1">
+                <div className="flex flex-col items-center flex-1">
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-full ring-2 transition-all ${
+                    done ? "bg-chargiz-teal text-white ring-chargiz-teal"
+                    : active ? "bg-primary text-primary-foreground ring-primary"
+                    : "bg-muted text-muted-foreground ring-border"
+                  }`}>
+                    {done ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-4 w-4" />}
+                  </div>
+                  <span className={`mt-1.5 text-[11px] font-medium uppercase tracking-wider ${
+                    active ? "text-primary" : done ? "text-chargiz-teal" : "text-muted-foreground"
+                  }`}>
+                    {s.label}
+                  </span>
                 </div>
-                <span className={`text-xs font-medium hidden sm:block ${active ? "text-foreground" : "text-muted-foreground"}`}>
-                  {s.label}
-                </span>
-                {i < steps.length - 1 && <div className={`h-px w-6 ${i < stepIndex ? "bg-primary" : "bg-border"}`} />}
+                {i < steps.length - 1 && (
+                  <div className={`h-px flex-1 mx-2 mb-5 transition-all ${done ? "bg-chargiz-teal" : "bg-border"}`} />
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* Card */}
+        {/* Card avec contenu de l'étape */}
         <div className="rounded-2xl border border-border bg-card p-6 shadow-xl sm:p-8">
-
-          {/* ── Step 1 : Profile ── */}
-          {step === "profile" && (
-            <div className="space-y-5">
-              <div>
-                <h2 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
-                  <User className="h-5 w-5 text-primary" /> Vos informations
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">Vérifiez et complétez vos informations personnelles.</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground">Prénom *</label>
-                  <input
-                    value={prenom}
-                    onChange={e => setPrenom(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    placeholder="Prénom"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Nom *</label>
-                  <input
-                    value={nom}
-                    onChange={e => setNom(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    placeholder="Nom"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Email (non modifiable)</label>
-                <input
-                  value={user.email}
-                  disabled
-                  className="mt-1 w-full rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Téléphone</label>
-                <input
-                  value={telephone}
-                  onChange={e => setTelephone(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  placeholder="+33 6 XX XX XX XX"
-                  type="tel"
-                />
-              </div>
-              <button
-                onClick={handleSaveProfile}
-                disabled={!nom.trim() || !prenom.trim() || savingProfile}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Continuer <ChevronRight className="h-4 w-4" /></>}
-              </button>
+          {formError && (
+            <div className="mb-4 flex items-start gap-2.5 rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2.5">
+              <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <p className="text-sm text-destructive">{formError}</p>
             </div>
           )}
 
-          {/* ── Step 2 : Home ── */}
-          {step === "home" && (
-            <div className="space-y-5">
-              <div>
-                <h2 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary" /> Votre domicile
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  ChargiZ utilise votre position domicile pour différencier les recharges remboursables (domicile) des autres.
-                </p>
-              </div>
-
-              {homeSet ? (
-                <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-primary font-medium text-sm">
-                    <CheckCircle2 className="h-4 w-4" /> Domicile enregistré
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{homeAddress}</p>
-                  <button
-                    onClick={() => { setHomeSet(false); setSearchResult(null); }}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    Modifier
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Option A — GPS */}
-                  <div className="rounded-xl border border-border p-4 space-y-2">
-                    <p className="text-sm font-medium text-card-foreground">Option A — Je suis chez moi maintenant</p>
-                    <p className="text-xs text-muted-foreground">Cliquez depuis votre domicile pour une précision maximale.</p>
-                    <button
-                      onClick={handleGPS}
-                      disabled={locating || savingHome}
-                      className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50"
-                    >
-                      {locating || savingHome ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
-                      {locating ? "Localisation…" : savingHome ? "Enregistrement…" : "Utiliser ma position GPS"}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-px bg-border" />
-                    <span className="text-xs text-muted-foreground font-medium">ou</span>
-                    <div className="flex-1 h-px bg-border" />
-                  </div>
-
-                  {/* Option B — Adresse */}
-                  <div className="rounded-xl border border-border p-4 space-y-3">
-                    <p className="text-sm font-medium text-card-foreground">Option B — Saisir mon adresse</p>
-                    <div className="flex gap-2">
-                      <input
-                        value={addressInput}
-                        onChange={e => setAddressInput(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && handleAddressSearch()}
-                        className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                        placeholder="12 rue des Lilas, Paris"
-                      />
-                      <button
-                        onClick={handleAddressSearch}
-                        disabled={searching || !addressInput.trim()}
-                        className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
-                      >
-                        {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                      </button>
-                    </div>
-
-                    {searchResult && (
-                      <div className="rounded-lg bg-muted/50 p-3 space-y-2">
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          📍 {searchResult.display_name}
-                        </p>
-                        <button
-                          onClick={handleConfirmAddress}
-                          disabled={savingHome}
-                          className="flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50"
-                        >
-                          {savingHome ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-                          Confirmer cette adresse
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => { setHomeSkipped(true); setStep("smartcar"); }}
-                  className="flex-1 rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground hover:bg-muted"
-                >
-                  Passer (définir plus tard)
-                </button>
-                <button
-                  onClick={() => setStep("smartcar")}
-                  disabled={!homeSet && !homeSkipped}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Continuer <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-              {homeSkipped && !homeSet && (
-                <p className="text-xs text-amber-600 text-center">
-                  ⚠️ Sans domicile défini, vos recharges ne pourront pas être remboursées. Vous pouvez le définir dans "Mes informations" après connexion.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* ── Step 3 : Smartcar ── */}
-          {step === "smartcar" && (
-            <div className="space-y-5">
-              <div>
-                <h2 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
-                  <Car className="h-5 w-5 text-primary" /> Connexion véhicule
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Connectez votre véhicule électrique via Smartcar pour activer le suivi automatique.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                {["Redirection vers Smartcar", "Choisissez votre constructeur (Tesla, Renault…)", "Connectez-vous avec votre compte constructeur", "ChargiZ récupère vos données automatiquement"].map((s, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">{i + 1}</span>
-                    <p className="text-sm text-muted-foreground">{s}</p>
-                  </div>
-                ))}
-              </div>
-
-              <a
-                href={user.smartcar_auth_url}
-                className="group flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-4 text-sm font-bold text-primary-foreground shadow-lg hover:bg-chargiz-teal-light"
-              >
-                Connecter mon véhicule via Smartcar
-                <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </a>
-
-              <p className="text-center text-xs text-muted-foreground">
-                ChargiZ ne voit jamais vos identifiants constructeur. Connexion sécurisée OAuth.
+          {/* ═══ ÉTAPE 1 — PROFIL ═══ */}
+          {step === "profil" && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-card-foreground">Vos informations</h2>
+              <p className="text-xs text-muted-foreground -mt-3">
+                Le pays détermine le facteur d'émission CO₂ utilisé dans vos statistiques.
               </p>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">
+                  Téléphone <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="tel"
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  value={profil.telephone}
+                  onChange={e => setProfil(p => ({ ...p, telephone: e.target.value }))}
+                  placeholder="+33 6 12 34 56 78"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">
+                  Pays <span className="text-destructive">*</span>
+                </label>
+                <select
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  value={profil.pays_code}
+                  onChange={e => { setProfil(p => ({ ...p, pays_code: e.target.value })); setAdresse(a => ({ ...a, pays_code: e.target.value })); }}
+                >
+                  <option value="FR">France</option>
+                  <option value="DE">Allemagne</option>
+                  <option value="BE">Belgique</option>
+                  <option value="CH">Suisse</option>
+                  <option value="ES">Espagne</option>
+                  <option value="IT">Italie</option>
+                  <option value="LU">Luxembourg</option>
+                  <option value="NL">Pays-Bas</option>
+                  <option value="PT">Portugal</option>
+                  <option value="GB">Royaume-Uni</option>
+                </select>
+              </div>
             </div>
           )}
+
+          {/* ═══ ÉTAPE 2 — ADRESSE + POINT DE RECHARGE ═══ */}
+          {step === "adresse" && (
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-lg font-semibold text-card-foreground">Votre adresse domicile</h2>
+                <p className="text-xs text-muted-foreground">
+                  Sert à qualifier vos recharges : à domicile ou en déplacement.
+                </p>
+              </div>
+              <AddressAutocomplete value={adresse} onChange={setAdresse} required hideCountry />
+
+              {/* Point de recharge distant */}
+              <div className="border-t border-border pt-4">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Votre point de recharge est-il à plus de 100m de votre domicile ?
+                </label>
+                <p className="text-[11px] text-muted-foreground mb-3">
+                  Si oui (copropriété, parking déporté…), positionnez le pin précis sur la carte.
+                </p>
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setPointRechargeDistant("non")}
+                    className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
+                      pointRechargeDistant === "non"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                  >Non — proche de mon domicile</button>
+                  <button
+                    type="button"
+                    onClick={() => setPointRechargeDistant("oui")}
+                    className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
+                      pointRechargeDistant === "oui"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                  >Oui — préciser sur la carte</button>
+                </div>
+                {pointRechargeDistant === "oui" && (
+                  <MapPinPicker
+                    initialLat={adresse.latitude}
+                    initialLng={adresse.longitude}
+                    onChange={(lat, lng) => setPointRecharge({ lat, lng })}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ═══ ÉTAPE 3 — VÉHICULE ═══ */}
+          {step === "vehicule" && (
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-lg font-semibold text-card-foreground">Votre véhicule</h2>
+                <p className="text-xs text-muted-foreground">
+                  Sélectionnez votre véhicule dans la base ou saisissez-le manuellement.
+                </p>
+              </div>
+              <VehiculeSelector value={vehicule} onChange={setVehicule} required />
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">
+                  Immatriculation <span className="text-destructive">*</span>
+                </label>
+                <input
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm font-mono uppercase tracking-wide outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  value={immat}
+                  onChange={e => setImmat(normalizeImmat(e.target.value))}
+                  placeholder="AB123CD"
+                  maxLength={10}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Lettres et chiffres uniquement — saisie auto-formatée.
+                </p>
+              </div>
+              <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
+                <strong className="text-foreground">Prochaine étape :</strong> vous serez redirigé vers Smartcar
+                pour autoriser ChargiZ à récupérer les données de votre véhicule (kilométrage, état de charge…).
+                ChargiZ ne voit jamais vos identifiants constructeur.
+              </div>
+            </div>
+          )}
+
+          {/* Navigation */}
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={prevStep}
+              disabled={step === "profil" || saving}
+              className="flex items-center gap-1.5 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="h-4 w-4" /> Précédent
+            </button>
+            <button
+              type="button"
+              onClick={nextStep}
+              disabled={saving}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-60 shadow-md"
+            >
+              {saving
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Enregistrement...</>
+                : step === "vehicule"
+                  ? <>Connecter mon véhicule <ChevronRight className="h-4 w-4" /></>
+                  : <>Continuer <ChevronRight className="h-4 w-4" /></>}
+            </button>
+          </div>
         </div>
 
         <div className="text-center opacity-40">

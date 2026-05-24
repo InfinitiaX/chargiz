@@ -33,10 +33,11 @@ import { Route as DashboardAdministrationRouteImport } from './routes/dashboard/
 import { Route as DashboardListesVehiculesRouteImport } from './routes/dashboard/listes/vehicules'
 import { Route as DashboardListesSitesRouteImport } from './routes/dashboard/listes/sites'
 import { Route as DashboardListesFilialesRouteImport } from './routes/dashboard/listes/filiales'
-import { Route as DashboardListesEntreprisesRouteImport } from './routes/dashboard/listes/entreprises'
 import { Route as DashboardListesCollaborateursRouteImport } from './routes/dashboard/listes/collaborateurs'
 import { Route as DashboardCollaborateurIdRouteImport } from './routes/dashboard/collaborateur/$id'
+import { Route as DashboardListesEntreprisesIndexRouteImport } from './routes/dashboard/listes/entreprises/index'
 import { Route as DashboardListesVehiculesVehiculeIdRouteImport } from './routes/dashboard/listes/vehicules.$vehiculeId'
+import { Route as DashboardListesEntreprisesIdRouteImport } from './routes/dashboard/listes/entreprises/$id'
 
 const VehiculesRoute = VehiculesRouteImport.update({
   id: '/vehicules',
@@ -160,12 +161,6 @@ const DashboardListesFilialesRoute = DashboardListesFilialesRouteImport.update({
   path: '/filiales',
   getParentRoute: () => DashboardListesRoute,
 } as any)
-const DashboardListesEntreprisesRoute =
-  DashboardListesEntreprisesRouteImport.update({
-    id: '/entreprises',
-    path: '/entreprises',
-    getParentRoute: () => DashboardListesRoute,
-  } as any)
 const DashboardListesCollaborateursRoute =
   DashboardListesCollaborateursRouteImport.update({
     id: '/collaborateurs',
@@ -178,11 +173,23 @@ const DashboardCollaborateurIdRoute =
     path: '/collaborateur/$id',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardListesEntreprisesIndexRoute =
+  DashboardListesEntreprisesIndexRouteImport.update({
+    id: '/entreprises/',
+    path: '/entreprises/',
+    getParentRoute: () => DashboardListesRoute,
+  } as any)
 const DashboardListesVehiculesVehiculeIdRoute =
   DashboardListesVehiculesVehiculeIdRouteImport.update({
     id: '/$vehiculeId',
     path: '/$vehiculeId',
     getParentRoute: () => DashboardListesVehiculesRoute,
+  } as any)
+const DashboardListesEntreprisesIdRoute =
+  DashboardListesEntreprisesIdRouteImport.update({
+    id: '/entreprises/$id',
+    path: '/entreprises/$id',
+    getParentRoute: () => DashboardListesRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -209,11 +216,12 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/collaborateur/$id': typeof DashboardCollaborateurIdRoute
   '/dashboard/listes/collaborateurs': typeof DashboardListesCollaborateursRoute
-  '/dashboard/listes/entreprises': typeof DashboardListesEntreprisesRoute
   '/dashboard/listes/filiales': typeof DashboardListesFilialesRoute
   '/dashboard/listes/sites': typeof DashboardListesSitesRoute
   '/dashboard/listes/vehicules': typeof DashboardListesVehiculesRouteWithChildren
+  '/dashboard/listes/entreprises/$id': typeof DashboardListesEntreprisesIdRoute
   '/dashboard/listes/vehicules/$vehiculeId': typeof DashboardListesVehiculesVehiculeIdRoute
+  '/dashboard/listes/entreprises/': typeof DashboardListesEntreprisesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -238,11 +246,12 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/collaborateur/$id': typeof DashboardCollaborateurIdRoute
   '/dashboard/listes/collaborateurs': typeof DashboardListesCollaborateursRoute
-  '/dashboard/listes/entreprises': typeof DashboardListesEntreprisesRoute
   '/dashboard/listes/filiales': typeof DashboardListesFilialesRoute
   '/dashboard/listes/sites': typeof DashboardListesSitesRoute
   '/dashboard/listes/vehicules': typeof DashboardListesVehiculesRouteWithChildren
+  '/dashboard/listes/entreprises/$id': typeof DashboardListesEntreprisesIdRoute
   '/dashboard/listes/vehicules/$vehiculeId': typeof DashboardListesVehiculesVehiculeIdRoute
+  '/dashboard/listes/entreprises': typeof DashboardListesEntreprisesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -269,11 +278,12 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/collaborateur/$id': typeof DashboardCollaborateurIdRoute
   '/dashboard/listes/collaborateurs': typeof DashboardListesCollaborateursRoute
-  '/dashboard/listes/entreprises': typeof DashboardListesEntreprisesRoute
   '/dashboard/listes/filiales': typeof DashboardListesFilialesRoute
   '/dashboard/listes/sites': typeof DashboardListesSitesRoute
   '/dashboard/listes/vehicules': typeof DashboardListesVehiculesRouteWithChildren
+  '/dashboard/listes/entreprises/$id': typeof DashboardListesEntreprisesIdRoute
   '/dashboard/listes/vehicules/$vehiculeId': typeof DashboardListesVehiculesVehiculeIdRoute
+  '/dashboard/listes/entreprises/': typeof DashboardListesEntreprisesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -301,11 +311,12 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dashboard/collaborateur/$id'
     | '/dashboard/listes/collaborateurs'
-    | '/dashboard/listes/entreprises'
     | '/dashboard/listes/filiales'
     | '/dashboard/listes/sites'
     | '/dashboard/listes/vehicules'
+    | '/dashboard/listes/entreprises/$id'
     | '/dashboard/listes/vehicules/$vehiculeId'
+    | '/dashboard/listes/entreprises/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -330,11 +341,12 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/dashboard/collaborateur/$id'
     | '/dashboard/listes/collaborateurs'
-    | '/dashboard/listes/entreprises'
     | '/dashboard/listes/filiales'
     | '/dashboard/listes/sites'
     | '/dashboard/listes/vehicules'
+    | '/dashboard/listes/entreprises/$id'
     | '/dashboard/listes/vehicules/$vehiculeId'
+    | '/dashboard/listes/entreprises'
   id:
     | '__root__'
     | '/'
@@ -360,11 +372,12 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dashboard/collaborateur/$id'
     | '/dashboard/listes/collaborateurs'
-    | '/dashboard/listes/entreprises'
     | '/dashboard/listes/filiales'
     | '/dashboard/listes/sites'
     | '/dashboard/listes/vehicules'
+    | '/dashboard/listes/entreprises/$id'
     | '/dashboard/listes/vehicules/$vehiculeId'
+    | '/dashboard/listes/entreprises/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -554,13 +567,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardListesFilialesRouteImport
       parentRoute: typeof DashboardListesRoute
     }
-    '/dashboard/listes/entreprises': {
-      id: '/dashboard/listes/entreprises'
-      path: '/entreprises'
-      fullPath: '/dashboard/listes/entreprises'
-      preLoaderRoute: typeof DashboardListesEntreprisesRouteImport
-      parentRoute: typeof DashboardListesRoute
-    }
     '/dashboard/listes/collaborateurs': {
       id: '/dashboard/listes/collaborateurs'
       path: '/collaborateurs'
@@ -575,12 +581,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCollaborateurIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/listes/entreprises/': {
+      id: '/dashboard/listes/entreprises/'
+      path: '/entreprises'
+      fullPath: '/dashboard/listes/entreprises/'
+      preLoaderRoute: typeof DashboardListesEntreprisesIndexRouteImport
+      parentRoute: typeof DashboardListesRoute
+    }
     '/dashboard/listes/vehicules/$vehiculeId': {
       id: '/dashboard/listes/vehicules/$vehiculeId'
       path: '/$vehiculeId'
       fullPath: '/dashboard/listes/vehicules/$vehiculeId'
       preLoaderRoute: typeof DashboardListesVehiculesVehiculeIdRouteImport
       parentRoute: typeof DashboardListesVehiculesRoute
+    }
+    '/dashboard/listes/entreprises/$id': {
+      id: '/dashboard/listes/entreprises/$id'
+      path: '/entreprises/$id'
+      fullPath: '/dashboard/listes/entreprises/$id'
+      preLoaderRoute: typeof DashboardListesEntreprisesIdRouteImport
+      parentRoute: typeof DashboardListesRoute
     }
   }
 }
@@ -602,18 +622,20 @@ const DashboardListesVehiculesRouteWithChildren =
 
 interface DashboardListesRouteChildren {
   DashboardListesCollaborateursRoute: typeof DashboardListesCollaborateursRoute
-  DashboardListesEntreprisesRoute: typeof DashboardListesEntreprisesRoute
   DashboardListesFilialesRoute: typeof DashboardListesFilialesRoute
   DashboardListesSitesRoute: typeof DashboardListesSitesRoute
   DashboardListesVehiculesRoute: typeof DashboardListesVehiculesRouteWithChildren
+  DashboardListesEntreprisesIdRoute: typeof DashboardListesEntreprisesIdRoute
+  DashboardListesEntreprisesIndexRoute: typeof DashboardListesEntreprisesIndexRoute
 }
 
 const DashboardListesRouteChildren: DashboardListesRouteChildren = {
   DashboardListesCollaborateursRoute: DashboardListesCollaborateursRoute,
-  DashboardListesEntreprisesRoute: DashboardListesEntreprisesRoute,
   DashboardListesFilialesRoute: DashboardListesFilialesRoute,
   DashboardListesSitesRoute: DashboardListesSitesRoute,
   DashboardListesVehiculesRoute: DashboardListesVehiculesRouteWithChildren,
+  DashboardListesEntreprisesIdRoute: DashboardListesEntreprisesIdRoute,
+  DashboardListesEntreprisesIndexRoute: DashboardListesEntreprisesIndexRoute,
 }
 
 const DashboardListesRouteWithChildren = DashboardListesRoute._addFileChildren(

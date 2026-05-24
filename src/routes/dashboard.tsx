@@ -14,6 +14,9 @@ function DashboardLayout() {
   useEffect(() => {
     if (!loading && !user) {
       navigate({ to: "/" });
+    } else if (!loading && user?.password_change_required) {
+      // BugID_001 — force le changement de mot de passe avant accès au dashboard
+      navigate({ to: "/force-password-change" });
     }
   }, [loading, user, navigate]);
 

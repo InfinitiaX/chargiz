@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import {
   ArrowLeft, Building2, Users, Car, Zap, Euro, Battery,
-  MapPin, Mail, Phone, Hash, Calendar, ShieldCheck,
+  MapPin, Mail, Phone, Hash, Calendar, ShieldCheck, Check, ArrowRight,
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/listes/entreprises/$id")({
@@ -159,7 +159,7 @@ function EntrepriseDetail() {
                             {String(u.role ?? "").replace(/_/g, " ")}
                           </span>
                         </td>
-                        <td className="px-4 py-2">{u.is_active ? "✓" : "—"}</td>
+                        <td className="px-4 py-2">{u.is_active ? <Check className="h-4 w-4 text-chargiz-teal" /> : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -192,10 +192,10 @@ function EntrepriseDetail() {
                     <td className="px-4 py-2 font-medium">{c.prenom} {c.nom}</td>
                     <td className="px-4 py-2 text-muted-foreground">{c.email}</td>
                     <td className="px-4 py-2 text-muted-foreground">{c.telephone ?? "—"}</td>
-                    <td className="px-4 py-2">{c.is_active ? "✓" : "—"}</td>
+                    <td className="px-4 py-2">{c.is_active ? <Check className="h-4 w-4 text-chargiz-teal" /> : "—"}</td>
                     <td className="px-4 py-2 text-right">
-                      <Link to="/dashboard/collaborateur/$id" params={{ id: c.id }} className="text-xs text-primary hover:underline">
-                        Voir →
+                      <Link to="/dashboard/collaborateur/$id" params={{ id: c.id }} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                        Voir <ArrowRight className="h-3 w-3" />
                       </Link>
                     </td>
                   </tr>

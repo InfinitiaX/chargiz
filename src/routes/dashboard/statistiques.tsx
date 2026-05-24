@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import KpiCard from "@/components/KpiCard";
+import PageSkeleton from "@/components/PageSkeleton";
+import DateRangeFilter, { isDateRangeValid } from "@/components/DateRangeFilter";
 import { Users, Car, Home, MapPin, Zap, Euro, Calendar } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/statistiques")({
@@ -30,6 +32,11 @@ function StatistiquesPage() {
   useEffect(() => {
     // Superadmin: load platform-wide; otherwise scope to entreprise
     if (!isSuperadmin && !entrepriseId) {
+      setLoading(false);
+      return;
+    }
+    // Évite les requêtes inutiles si la plage est invalide
+    if (!isDateRangeValid(dateFrom, dateTo)) {
       setLoading(false);
       return;
     }
@@ -77,11 +84,7 @@ function StatistiquesPage() {
   const pctHors = energieTotal > 0 ? (stats.energieHors / energieTotal * 100) : 0;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <PageSkeleton kpiCount={7} rowCount={0} showFilters={false} />;
   }
 
   return (
@@ -95,25 +98,26 @@ function StatistiquesPage() {
               : "Vue globale de l'activité de recharge de l'entreprise"}
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-transparent text-xs outline-none" />
-          <span className="text-xs text-muted-foreground">→</span>
-          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-transparent text-xs outline-none" />
-        </div>
+        <DateRangeFilter
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onFromChange={setDateFrom}
+          onToChange={setDateTo}
+        />
       </div>
 
       {/* 7 KPIs as spec */}
       <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard title="Nombre conducteurs" value={String(stats.nbConducteurs)} icon={Users} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
-        <KpiCard title="Nombre véhicules" value={String(stats.nbVehicules)} icon={Car} colorClass="bg-kpi-energy/10 text-kpi-energy" />
-        <KpiCard title="Sessions domicile (mois)" value={String(stats.sessionsDom)} icon={Home} colorClass="bg-kpi-home/10 text-kpi-home" />
-        <KpiCard title="Sessions hors domicile (mois)" value={String(stats.sessionsHors)} icon={MapPin} colorClass="bg-kpi-away/10 text-kpi-away" />
+        <KpiCard title="Nombre conducteurs" value={String(stats.nbConducteurs)} icon={Users} tone="neutral" />
+        <KpiCard title="Nombre véhicules" value={String(stats.nbVehicules)} icon={Car} tone="neutral" />
+        <KpiCard title="Sessions domicile (mois)" value={String(stats.sessionsDom)} icon={Home} tone="accent" />
+        <KpiCard title="Sessions hors domicile (mois)" value={String(stats.sessionsHors)} icon={MapPin} tone="primary" />
       </div>
       <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <KpiCard title="Énergie domicile" value={`${stats.energieDom.toFixed(1)} kWh`} icon={Zap} colorClass="bg-kpi-home/10 text-kpi-home" />
-        <KpiCard title="Énergie hors domicile" value={`${stats.energieHors.toFixed(1)} kWh`} icon={Zap} colorClass="bg-kpi-away/10 text-kpi-away" />
-        <KpiCard title="Coût total remboursable" value={`${stats.coutTotal.toFixed(2)} €`} icon={Euro} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
+        {/* BugID_021 — format décimal 2 chiffres */}
+        <KpiCard title="Énergie domicile" value={`${stats.energieDom.toFixed(2)} kWh`} icon={Zap} tone="accent" />
+        <KpiCard title="Énergie hors domicile" value={`${stats.energieHors.toFixed(2)} kWh`} icon={Zap} tone="primary" />
+        <KpiCard title="Coût total remboursable" value={`${stats.coutTotal.toFixed(2)} €`} icon={Euro} tone="accent" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -124,7 +128,7 @@ function StatistiquesPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-muted-foreground">Domicile</span>
-                <span className="text-sm font-semibold text-card-foreground">{pctDom.toFixed(1)}% — {stats.energieDom.toFixed(0)} kWh</span>
+                <span className="text-sm font-semibold text-card-foreground">{pctDom.toFixed(1)}% — {stats.energieDom.toFixed(2)} kWh</span>
               </div>
               <div className="h-3 w-full rounded-full bg-muted">
                 <div className="h-3 rounded-full bg-chargiz-teal transition-all" style={{ width: `${pctDom}%` }} />
@@ -133,7 +137,7 @@ function StatistiquesPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-muted-foreground">Hors domicile</span>
-                <span className="text-sm font-semibold text-card-foreground">{pctHors.toFixed(1)}% — {stats.energieHors.toFixed(0)} kWh</span>
+                <span className="text-sm font-semibold text-card-foreground">{pctHors.toFixed(1)}% — {stats.energieHors.toFixed(2)} kWh</span>
               </div>
               <div className="h-3 w-full rounded-full bg-muted">
                 <div className="h-3 rounded-full bg-chargiz-lime transition-all" style={{ width: `${pctHors}%` }} />

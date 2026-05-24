@@ -2,9 +2,18 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import CreateVehiculeDialog from "@/components/CreateVehiculeDialog";
-import { Plus, Search, Car, Eye, Edit, Trash2, X, Download } from "lucide-react";
+import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
+import TablePagination from "@/components/TablePagination";
+import PageSkeleton from "@/components/PageSkeleton";
+import EmptyState from "@/components/EmptyState";
+import IconTooltip from "@/components/IconTooltip";
+import { AlertCircle, Archive, ArchiveRestore, Car, Download, Edit, Eye, Link2, Plus, Search, Trash2, X } from "lucide-react";
+import AssignVehicleDialog from "@/components/AssignVehicleDialog";
 import { exportCSV } from "@/lib/export";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
+
+const PAGE_SIZE = 25;
 
 export const Route = createFileRoute("/dashboard/listes/vehicules/")({
   component: ListeVehicules,
@@ -36,6 +45,13 @@ function ListeVehicules() {
   const [filterAbo, setFilterAbo] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [editVeh, setEditVeh] = useState<Vehicule | null>(null);
+  const [assignVeh, setAssignVeh] = useState<Vehicule | null>(null);
+  /** ID du véhicule en cours de traitement (archive/unarchive). */
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Vehicule | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (loading) return;
@@ -60,19 +76,107 @@ function ListeVehicules() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Voulez-vous supprimer ce véhicule ?")) return;
+  function vehLabel(v: Vehicule) {
+    return `${v.marque || ""}${v.modele ? " " + v.modele : ""}${v.immatriculation ? " (" + v.immatriculation + ")" : ""}`.trim() || "Véhicule";
+  }
+
+  function handleArchive(v: Vehicule) {
+    toast("Archiver ce véhicule ?", {
+      description: `${vehLabel(v)} sera marqué comme archivé.`,
+      icon: <Archive className="h-4 w-4 text-amber-500" />,
+      duration: 8000,
+      action: { label: "Archiver", onClick: () => doArchive(v) },
+      cancel: { label: "Annuler", onClick: () => {} },
+    });
+  }
+
+  async function doArchive(v: Vehicule) {
+    setProcessingId(v.id);
     try {
-      await apiFetch(`/api/vehicules/${id}`, { method: "DELETE" });
+      await apiFetch(`/api/vehicules/${v.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ statut_affectation: "archive" }),
+      });
+      toast.warning("Véhicule archivé", {
+        description: `${vehLabel(v)} a été archivé.`,
+        icon: <Archive className="h-4 w-4 text-amber-500" />,
+        duration: 4000,
+      });
       loadVehicules();
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de la suppression");
+      toast.error("Archivage impossible", {
+        description: "Une erreur est survenue. Veuillez réessayer.",
+        icon: <AlertCircle className="h-4 w-4" />,
+        duration: 4000,
+      });
+    } finally {
+      setProcessingId(null);
     }
-  };
+  }
+
+  function handleUnarchive(v: Vehicule) {
+    toast("Désarchiver ce véhicule ?", {
+      description: `${vehLabel(v)} sera remis en service.`,
+      icon: <ArchiveRestore className="h-4 w-4 text-chargiz-teal" />,
+      duration: 8000,
+      action: { label: "Désarchiver", onClick: () => doUnarchive(v) },
+      cancel: { label: "Annuler", onClick: () => {} },
+    });
+  }
+
+  async function doUnarchive(v: Vehicule) {
+    setProcessingId(v.id);
+    try {
+      await apiFetch(`/api/vehicules/${v.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ statut_affectation: "non_affecte" }),
+      });
+      toast.success("Véhicule désarchivé", {
+        description: `${vehLabel(v)} est de nouveau disponible.`,
+        icon: <ArchiveRestore className="h-4 w-4 text-chargiz-teal" />,
+        duration: 4000,
+      });
+      loadVehicules();
+    } catch (err) {
+      console.error(err);
+      toast.error("Désarchivage impossible", {
+        description: "Une erreur est survenue. Veuillez réessayer.",
+        icon: <AlertCircle className="h-4 w-4" />,
+        duration: 4000,
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  async function doDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await apiFetch(`/api/vehicules/${deleteTarget.id}`, { method: "DELETE" });
+      toast.success("Véhicule supprimé", {
+        description: `${vehLabel(deleteTarget)} a été supprimé définitivement.`,
+        icon: <Trash2 className="h-4 w-4" />,
+        duration: 4000,
+      });
+      setDeleteTarget(null);
+      loadVehicules();
+    } catch (err) {
+      console.error(err);
+      toast.error("Suppression impossible", {
+        description: "Une erreur est survenue. Veuillez réessayer.",
+        icon: <AlertCircle className="h-4 w-4" />,
+        duration: 4000,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const handleEditSave = async () => {
     if (!editVeh) return;
+    setSavingEdit(true);
     try {
       await apiFetch(`/api/vehicules/${editVeh.id}`, {
         method: "PATCH",
@@ -84,11 +188,22 @@ function ListeVehicules() {
           capacite_batterie: editVeh.capacite_batterie,
         }),
       });
+      toast.success("Véhicule mis à jour", {
+        description: `${vehLabel(editVeh)} a été modifié avec succès.`,
+        icon: <Edit className="h-4 w-4" />,
+        duration: 4000,
+      });
       setEditVeh(null);
       loadVehicules();
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de la modification");
+      toast.error("Modification impossible", {
+        description: "Une erreur est survenue. Veuillez réessayer.",
+        icon: <AlertCircle className="h-4 w-4" />,
+        duration: 4000,
+      });
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -99,14 +214,18 @@ function ListeVehicules() {
     return true;
   });
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleFilterChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setter(e.target.value);
+    setPage(1);
+  };
+
   const inputCls = "w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <PageSkeleton kpiCount={0} rowCount={8} />;
   }
 
   return (
@@ -126,9 +245,11 @@ function ListeVehicules() {
           })))} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
             <Download className="h-4 w-4" /> Exporter
           </button>
-          <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
-            <Plus className="h-4 w-4" /> Ajouter un véhicule
-          </button>
+          {role !== "superadmin" && (
+            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
+              <Plus className="h-4 w-4" /> Ajouter un véhicule
+            </button>
+          )}
         </div>
       </div>
 
@@ -139,14 +260,14 @@ function ListeVehicules() {
             className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)}
+          <select value={filterStatut} onChange={handleFilterChange(setFilterStatut)}
             className="flex-1 sm:flex-none rounded-lg border border-input bg-card px-3 py-2.5 text-sm outline-none focus:border-primary">
             <option value="">Tous statuts</option>
             <option value="affecte">Affecté</option>
             <option value="non_affecte">Non affecté</option>
             <option value="archive">Archivé</option>
           </select>
-          <select value={filterAbo} onChange={e => setFilterAbo(e.target.value)}
+          <select value={filterAbo} onChange={handleFilterChange(setFilterAbo)}
             className="flex-1 sm:flex-none rounded-lg border border-input bg-card px-3 py-2.5 text-sm outline-none focus:border-primary">
             <option value="">Toutes connexions</option>
             <option value="connecte">Connecté</option>
@@ -172,9 +293,22 @@ function ListeVehicules() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.length === 0 ? (
-                <tr><td colSpan={isSuperadmin ? 8 : 7} className="px-6 py-12 text-center text-muted-foreground">Aucun véhicule trouvé</td></tr>
-              ) : filtered.map(v => {
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={isSuperadmin ? 8 : 7}>
+                    <EmptyState
+                      icon={Car}
+                      title={search ? "Aucun résultat" : "Aucun véhicule"}
+                      description={search ? "Essayez d'autres mots-clés ou réinitialisez la recherche." : "Ajoutez un véhicule pour démarrer le suivi de recharge."}
+                      action={!search && entrepriseId ? (
+                        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
+                          <Plus className="h-4 w-4" /> Ajouter un véhicule
+                        </button>
+                      ) : undefined}
+                    />
+                  </td>
+                </tr>
+              ) : paginated.map(v => {
                 const collab = v.collaborateur_id ? collabs.get(v.collaborateur_id) : null;
                 const ent = isSuperadmin ? entreprises.get(v.entreprise_id) : null;
                 return (
@@ -220,12 +354,67 @@ function ListeVehicules() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Link to="/dashboard/listes/vehicules/$vehiculeId" params={{ vehiculeId: v.id }}
-                        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Fiche">
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                      <button onClick={() => setEditVeh({ ...v })} title="Modifier" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><Edit className="h-4 w-4" /></button>
-                      <button onClick={() => handleDelete(v.id)} title="Supprimer" className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                      <IconTooltip label="Voir la fiche">
+                        <Link to="/dashboard/listes/vehicules/$vehiculeId" params={{ vehiculeId: v.id }}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </IconTooltip>
+                      <IconTooltip label="Modifier le véhicule">
+                        <button
+                          onClick={() => setEditVeh({ ...v })}
+                          disabled={processingId === v.id}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      </IconTooltip>
+                      {/* Affecter : visible uniquement si véhicule libre + actif */}
+                      {!v.collaborateur_id && v.statut_affectation === "non_affecte" && (
+                        <IconTooltip label="Affecter à un collaborateur">
+                          <button
+                            onClick={() => setAssignVeh(v)}
+                            disabled={processingId === v.id}
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-chargiz-lime/30 hover:text-chargiz-teal transition-colors disabled:opacity-40"
+                          >
+                            <Link2 className="h-4 w-4" />
+                          </button>
+                        </IconTooltip>
+                      )}
+                      {v.statut_affectation === "archive" ? (
+                        <IconTooltip label="Désarchiver">
+                          <button
+                            onClick={() => handleUnarchive(v)}
+                            disabled={processingId === v.id}
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-chargiz-teal/10 hover:text-chargiz-teal transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {processingId === v.id
+                              ? <span className="h-4 w-4 block animate-spin rounded-full border-2 border-chargiz-teal border-t-transparent" />
+                              : <ArchiveRestore className="h-4 w-4" />}
+                          </button>
+                        </IconTooltip>
+                      ) : (
+                        <IconTooltip label="Archiver">
+                          <button
+                            onClick={() => handleArchive(v)}
+                            disabled={processingId === v.id}
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-amber-500/10 hover:text-amber-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {processingId === v.id
+                              ? <span className="h-4 w-4 block animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                              : <Archive className="h-4 w-4" />}
+                          </button>
+                        </IconTooltip>
+                      )}
+                      <IconTooltip label="Supprimer définitivement">
+                        <button
+                          onClick={() => setDeleteTarget(v)}
+                          disabled={processingId === v.id}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </IconTooltip>
                     </div>
                   </td>
                 </tr>
@@ -236,7 +425,41 @@ function ListeVehicules() {
         </div>
       </div>
 
+      <TablePagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={filtered.length}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
+
       {entrepriseId && <CreateVehiculeDialog entrepriseId={entrepriseId} open={showAdd} onClose={() => setShowAdd(false)} onCreated={loadVehicules} />}
+
+      {/* Affectation à un collaborateur */}
+      {assignVeh && (
+        <AssignVehicleDialog
+          open={!!assignVeh}
+          onClose={() => setAssignVeh(null)}
+          mode="from-vehicule"
+          vehicule={{
+            id: assignVeh.id,
+            marque: assignVeh.marque,
+            modele: assignVeh.modele,
+            immatriculation: assignVeh.immatriculation,
+            entreprise_id: assignVeh.entreprise_id,
+          }}
+          onAssigned={() => { setAssignVeh(null); loadVehicules(); }}
+        />
+      )}
+
+      <ConfirmDeleteDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title={deleteTarget ? `Supprimer ${vehLabel(deleteTarget)} ?` : ""}
+        description="Cette action est irréversible. Toutes les sessions de recharge associées seront définitivement perdues."
+        onConfirm={doDelete}
+        loading={deleting}
+      />
 
       {/* Edit Dialog */}
       {editVeh && (
@@ -252,13 +475,29 @@ function ListeVehicules() {
                 <div><label className="text-sm font-medium text-foreground">Modèle</label><input className={inputCls} value={editVeh.modele || ""} onChange={e => setEditVeh({ ...editVeh, modele: e.target.value })} /></div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><label className="text-sm font-medium text-foreground">Immatriculation</label><input className={inputCls} value={editVeh.immatriculation || ""} onChange={e => setEditVeh({ ...editVeh, immatriculation: e.target.value })} /></div>
+                <div>
+                  <label className="text-sm font-medium text-foreground">Immatriculation</label>
+                  <input
+                    className={`${inputCls} font-mono uppercase tracking-wide`}
+                    value={editVeh.immatriculation || ""}
+                    maxLength={10}
+                    onChange={e => setEditVeh({
+                      ...editVeh,
+                      // BugID_014 — normalise : majuscules + lettres/chiffres uniquement
+                      immatriculation: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+                    })}
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">Lettres et chiffres uniquement — saisie auto-formatée.</p>
+                </div>
                 <div><label className="text-sm font-medium text-foreground">VIN</label><input className={inputCls} value={editVeh.vin || ""} onChange={e => setEditVeh({ ...editVeh, vin: e.target.value })} /></div>
               </div>
               <div><label className="text-sm font-medium text-foreground">Capacité batterie (kWh)</label><input type="number" step="0.1" className={inputCls} value={editVeh.capacite_batterie || ""} onChange={e => setEditVeh({ ...editVeh, capacite_batterie: e.target.value ? parseFloat(e.target.value) : null })} /></div>
               <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setEditVeh(null)} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">Annuler</button>
-                <button onClick={handleEditSave} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">Enregistrer</button>
+                <button onClick={() => setEditVeh(null)} disabled={savingEdit} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">Annuler</button>
+                <button onClick={handleEditSave} disabled={savingEdit} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50">
+                  {savingEdit && <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />}
+                  {savingEdit ? "Enregistrement..." : "Enregistrer"}
+                </button>
               </div>
             </div>
           </div>

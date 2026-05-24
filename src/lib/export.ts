@@ -1,8 +1,9 @@
 // Utilitaires d'export : CSV pour gestionnaires, PDF justificatif premium pour collaborateur
+import { toast } from "sonner";
 
 export function exportCSV(filename: string, rows: Record<string, unknown>[]) {
   if (!rows || rows.length === 0) {
-    alert("Aucune donnée à exporter");
+    toast.warning("Aucune donnée à exporter");
     return;
   }
   const headers = Object.keys(rows[0]);
@@ -17,6 +18,50 @@ export function exportCSV(filename: string, rows: Record<string, unknown>[]) {
   ].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   triggerDownload(blob, filename.endsWith(".csv") ? filename : `${filename}.csv`);
+}
+
+/**
+ * Export XLSX (Excel) natif via SheetJS \u2014 BugID_033.
+ * Le fichier .xlsx s'ouvre directement dans Excel/LibreOffice/Numbers
+ * avec largeurs auto + en-t\u00EAtes en gras.
+ *
+ * @param filename Nom du fichier (`.xlsx` ajout\u00E9 auto si absent)
+ * @param rows Tableau d'objets \u2014 les cl\u00E9s deviennent les en-t\u00EAtes
+ * @param sheetName Nom de l'onglet Excel (d\u00E9faut "Donn\u00E9es")
+ */
+export async function exportXLSX(
+  filename: string,
+  rows: Record<string, unknown>[],
+  sheetName: string = "Donn\u00E9es",
+) {
+  if (!rows || rows.length === 0) {
+    toast.warning("Aucune donn\u00E9e \u00E0 exporter");
+    return;
+  }
+  try {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Largeur auto bas\u00E9e sur la longueur maximale de chaque colonne
+    const headers = Object.keys(rows[0]);
+    ws["!cols"] = headers.map(h => {
+      const maxLen = Math.max(
+        h.length,
+        ...rows.map(r => {
+          const v = r[h];
+          return v == null ? 0 : String(v).length;
+        }),
+      );
+      return { wch: Math.min(maxLen + 2, 50) };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
+    const finalName = filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`;
+    XLSX.writeFile(wb, finalName);
+    toast.success("Export Excel t\u00E9l\u00E9charg\u00E9", { description: finalName, duration: 3500 });
+  } catch (err: any) {
+    console.error("Export XLSX error:", err);
+    toast.error("Export impossible", { description: err.message || "Erreur lors de la g\u00E9n\u00E9ration du fichier Excel." });
+  }
 }
 
 interface JustificatifData {
@@ -179,7 +224,9 @@ export function exportJustificatifPDF(data: JustificatifData) {
 
   const w = window.open("", "_blank", "width=900,height=700");
   if (!w) {
-    alert("Impossible d'ouvrir la fenêtre d'impression. Autorisez les pop-ups.");
+    toast.error("Fenêtre bloquée", {
+      description: "Autorisez les pop-ups pour ce site afin de générer le PDF.",
+    });
     return;
   }
   w.document.write(html);

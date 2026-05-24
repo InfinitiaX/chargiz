@@ -1,7 +1,20 @@
 import { useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { X, AlertCircle } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { type AppRole, type Profile } from "@/hooks/useAuth";
+
+function friendlyError(raw: string): string {
+  const m = raw.toLowerCase();
+  if (m.includes("email") && (m.includes("déjà") || m.includes("taken") || m.includes("exist")))
+    return "Cette adresse email est déjà utilisée par un autre compte.";
+  if (m.includes("username") && (m.includes("déjà") || m.includes("taken") || m.includes("exist")))
+    return "Cet identifiant est déjà utilisé. Veuillez en choisir un autre.";
+  if (m.includes("session expir") || m.includes("401"))
+    return "Votre session a expiré. Veuillez vous reconnecter.";
+  if (m.includes("accès refusé") || m.includes("403") || m.includes("forbidden"))
+    return "Vous n'avez pas les droits pour effectuer cette action.";
+  return raw;
+}
 
 interface Props {
   actorRole: AppRole;
@@ -77,7 +90,7 @@ export default function CreateUserDialog({ actorRole, profile, open, defaultRole
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Impossible de creer le compte");
+      setError(friendlyError(err instanceof Error ? err.message : "Impossible de créer le compte."));
     } finally {
       setLoading(false);
     }
@@ -87,7 +100,7 @@ export default function CreateUserDialog({ actorRole, profile, open, defaultRole
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-lg rounded-lg bg-card p-6 shadow-xl border border-border max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-card-foreground">Creer un compte</h2>
+          <h2 className="text-lg font-semibold text-card-foreground">Créer un compte</h2>
           <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
@@ -95,7 +108,7 @@ export default function CreateUserDialog({ actorRole, profile, open, defaultRole
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-foreground">Role *</label>
+            <label className="text-sm font-medium text-foreground">Rôle *</label>
             <select className={inputCls} value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as AppRole }))}>
               {availableRoles.map((role) => (
                 <option key={role} value={role}>{ROLE_LABELS[role]}</option>
@@ -105,7 +118,7 @@ export default function CreateUserDialog({ actorRole, profile, open, defaultRole
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-foreground">Prenom *</label>
+              <label className="text-sm font-medium text-foreground">Prénom *</label>
               <input required className={inputCls} value={form.prenom} onChange={(e) => setForm((f) => ({ ...f, prenom: e.target.value }))} />
             </div>
             <div>
@@ -142,7 +155,12 @@ export default function CreateUserDialog({ actorRole, profile, open, defaultRole
             </div>
           )}
 
-          {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+          {error && (
+            <div className="flex items-start gap-2.5 rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2.5">
+              <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <p className="text-sm text-destructive leading-snug">{error}</p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">Annuler</button>

@@ -3,6 +3,9 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Building2, User, Shield, Save, Clock, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
+import AddressAutocomplete, { type AddressValue } from "@/components/AddressAutocomplete";
+import PhoneInput from "@/components/PhoneInput";
 
 export const Route = createFileRoute("/dashboard/reglages")({
   component: ReglagesPage,
@@ -32,8 +35,10 @@ function ReglagesPage() {
   const [entSaving, setEntSaving] = useState(false);
   const [entStatus, setEntStatus] = useState<{ ok?: string; err?: string }>({});
 
-  // ─── Mon compte (editable) ───
-  const [accountFullName, setAccountFullName] = useState("");
+  // ─── Mon compte / Responsable entreprise (BugID_022) ───
+  const [accountNom, setAccountNom] = useState("");
+  const [accountPrenom, setAccountPrenom] = useState("");
+  const [accountTelephone, setAccountTelephone] = useState("");
   const [accountEmail, setAccountEmail] = useState("");
   const [accountSaving, setAccountSaving] = useState(false);
   const [accountStatus, setAccountStatus] = useState<{ ok?: string; err?: string }>({});
@@ -54,8 +59,21 @@ function ReglagesPage() {
   const [passSuccess, setPassSuccess] = useState("");
 
   useEffect(() => {
-    setAccountFullName(`${profile?.prenom || ""} ${profile?.nom || ""}`.trim());
-    setAccountEmail(profile?.email || user?.email || "");
+    // BugID_022 — privilégier les champs séparés si présents côté User,
+    // sinon retomber sur le profile (collaborateur) ou un split du full_name.
+    const u: any = user || {};
+    const p: any = profile || {};
+    const splitFromFullName = (fn?: string) => {
+      const parts = (fn || "").trim().split(/\s+/);
+      if (parts.length === 0) return { p: "", n: "" };
+      if (parts.length === 1) return { p: parts[0], n: "" };
+      return { p: parts[0], n: parts.slice(1).join(" ") };
+    };
+    const fallback = splitFromFullName(u.full_name);
+    setAccountPrenom(u.prenom || p.prenom || fallback.p || "");
+    setAccountNom(u.nom || p.nom || fallback.n || "");
+    setAccountTelephone(u.telephone || p.telephone || "");
+    setAccountEmail(p.email || u.email || "");
   }, [profile, user]);
 
   useEffect(() => {
@@ -113,9 +131,15 @@ function ReglagesPage() {
     setAccountStatus({});
     setAccountSaving(true);
     try {
+      // BugID_022 — on envoie nom/prenom/telephone séparés + full_name agrégé
+      // (pour rétro-compatibilité avec l'affichage existant).
+      const fullName = `${accountPrenom} ${accountNom}`.trim();
       await api.users.update(user.id, {
         email: accountEmail,
-        full_name: accountFullName,
+        full_name: fullName,
+        nom: accountNom.trim() || null,
+        prenom: accountPrenom.trim() || null,
+        telephone: accountTelephone.trim() || null,
       });
       setAccountStatus({ ok: "Profil mis à jour." });
     } catch (err: any) {
@@ -128,17 +152,51 @@ function ReglagesPage() {
   const savePolitique = async () => {
     if (!entrepriseId) return;
     setPolStatus({});
+    // BugID_025 — strict positif
+    const priceNum = parseFloat(prixKwh);
+    if (!isFinite(priceNum) || priceNum <= 0) {
+      setPolStatus({ err: "Le coût du kWh doit être strictement positif." });
+      return;
+    }
+    // BugID_026 — borne supérieure 5 €/kWh
+    if (priceNum > 5) {
+      setPolStatus({ err: "Le coût du kWh doit être inférieur ou égal à 5 €/kWh (valeur anormalement élevée)." });
+      return;
+    }
+    // BugID_027 — au moins un jour éligible
+    if (joursEligibles.length === 0) {
+      setPolStatus({ err: "Au moins un jour doit être sélectionné dans les jours éligibles." });
+      return;
+    }
+    // BugID_024 — bascule individuel → global : avertir avant écrasement
+    const wasIndividuel = politique?.delegation_prix === "collaborateur";
+    if (wasIndividuel && delegation === "entreprise") {
+      const ok = window.confirm(
+        "Vous passez du mode individuel au mode global entreprise.\n\n" +
+        "Les coûts kWh et jours éligibles personnalisés sur chaque collaborateur seront écrasés " +
+        "par les valeurs globales définies ici.\n\nConfirmer le basculement ?"
+      );
+      if (!ok) {
+        setPolStatus({ err: "Bascule annulée." });
+        return;
+      }
+    }
+    const rounded = Math.round((priceNum + 1e-9) * 100) / 100;
+    setPrixKwh(rounded.toFixed(2));
     setPolSaving(true);
     try {
       await api.politiques.save({
         entreprise_id: entrepriseId,
-        prix_kwh: parseFloat(prixKwh) || 0.21,
+        prix_kwh: rounded,
         devise: "EUR",
         jours_fermeture: joursToMask(joursEligibles),
         delegation_prix: delegation,
         delegation_jours: delegation,
       });
       setPolStatus({ ok: "Politique de recharge enregistrée." });
+      // Recharge la politique pour que la prochaine bascule soit détectée
+      const pols = await api.politiques.list({ entreprise_id: entrepriseId });
+      if (pols.length > 0) setPolitique(pols[0]);
     } catch (err: any) {
       setPolStatus({ err: err.message || "Erreur lors de l'enregistrement." });
     } finally {
@@ -150,20 +208,38 @@ function ReglagesPage() {
     e.preventDefault();
     setPassError("");
     setPassSuccess("");
+
+    // Validations côté client (cohérence avec le backend)
     if (newPassword !== confirmPassword) {
-      setPassError("Les nouveaux mots de passe ne correspondent pas.");
+      setPassError("Les deux nouveaux mots de passe ne correspondent pas.");
       return;
     }
     if (newPassword.length < 8) {
       setPassError("Le mot de passe doit contenir au moins 8 caractères.");
       return;
     }
+    if (newPassword === oldPassword) {
+      setPassError("Le nouveau mot de passe doit être différent de l'ancien.");
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      setPassError("Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.");
+      return;
+    }
+
     try {
       await updatePassword(oldPassword, newPassword);
-      setPassSuccess("Mot de passe mis à jour.");
+      setPassSuccess("Mot de passe mis à jour avec succès.");
+      toast.success("Mot de passe modifié", {
+        description: "Votre nouveau mot de passe est actif.",
+        icon: <CheckCircle2 className="h-4 w-4" />,
+        duration: 4000,
+      });
       setOldPassword(""); setNewPassword(""); setConfirmPassword("");
     } catch (err: any) {
-      setPassError(err.message || "Erreur lors du changement de mot de passe.");
+      const msg = err.message || "Erreur lors du changement de mot de passe.";
+      setPassError(msg);
+      toast.error("Échec du changement", { description: msg, duration: 4000 });
     }
   };
 
@@ -218,20 +294,34 @@ function ReglagesPage() {
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Téléphone</label>
-                  <input className={`mt-1 ${inputCls}`} value={entreprise.telephone || ""} onChange={e => setEntreprise({ ...entreprise, telephone: e.target.value })} />
+                  <div className="mt-1">
+                    <PhoneInput
+                      value={entreprise.telephone || ""}
+                      onChange={(e164) => setEntreprise({ ...entreprise, telephone: e164 })}
+                      defaultCountry="FR"
+                    />
+                  </div>
                 </div>
-                <div className="sm:col-span-2">
-                  <label className="text-xs text-muted-foreground">Adresse</label>
-                  <input className={`mt-1 ${inputCls}`} value={entreprise.adresse || ""} onChange={e => setEntreprise({ ...entreprise, adresse: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Code postal</label>
-                  <input maxLength={5} className={`mt-1 ${inputCls}`} value={entreprise.code_postal || ""} onChange={e => setEntreprise({ ...entreprise, code_postal: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Ville</label>
-                  <input className={`mt-1 ${inputCls}`} value={entreprise.ville || ""} onChange={e => setEntreprise({ ...entreprise, ville: e.target.value })} />
-                </div>
+              </div>
+              {/* BugID_007 — Autocomplétion adresse */}
+              <div className="mt-2">
+                <AddressAutocomplete
+                  hideCountry
+                  value={{
+                    pays_code: "FR",
+                    adresse: entreprise.adresse || "",
+                    code_postal: entreprise.code_postal || "",
+                    ville: entreprise.ville || "",
+                    latitude: null,
+                    longitude: null,
+                  }}
+                  onChange={(v: AddressValue) => setEntreprise({
+                    ...entreprise,
+                    adresse: v.adresse,
+                    code_postal: v.code_postal,
+                    ville: v.ville,
+                  })}
+                />
               </div>
               <div className="pt-2">
                 <button type="submit" disabled={entSaving} className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:brightness-95 disabled:opacity-50">
@@ -242,19 +332,35 @@ function ReglagesPage() {
           </div>
         )}
 
-        {/* Mon compte */}
+        {/* BugID_022 — Bloc "Responsable entreprise" (ou "Mon compte" hors gest. entreprise) */}
         <div className="rounded-xl border border-border bg-card shadow-sm">
           <div className="flex items-center gap-3 border-b border-border px-6 py-4">
             <User className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold text-card-foreground">Mon compte</h3>
+            <h3 className="text-lg font-semibold text-card-foreground">
+              {isGestEntreprise ? "Responsable entreprise" : "Mon compte"}
+            </h3>
           </div>
           <div className="p-6 space-y-6">
             <form onSubmit={saveAccount} className="space-y-4">
               <Status s={accountStatus} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-muted-foreground">Nom complet</label>
-                  <input className={`mt-1 ${inputCls}`} value={accountFullName} onChange={e => setAccountFullName(e.target.value)} />
+                  <label className="text-xs text-muted-foreground">Prénom</label>
+                  <input className={`mt-1 ${inputCls}`} value={accountPrenom} onChange={e => setAccountPrenom(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Nom</label>
+                  <input className={`mt-1 ${inputCls}`} value={accountNom} onChange={e => setAccountNom(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Téléphone</label>
+                  <div className="mt-1">
+                    <PhoneInput
+                      value={accountTelephone}
+                      onChange={setAccountTelephone}
+                      defaultCountry="FR"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Email *</label>
@@ -340,8 +446,29 @@ function ReglagesPage() {
                     : "Valeur par défaut héritée par les nouveaux collaborateurs (modifiable sur la fiche)."}
                 </p>
                 <div className="flex items-center gap-3">
-                  <input type="number" step="0.001" min="0" max="5" value={prixKwh} onChange={e => setPrixKwh(e.target.value)} className={`${inputCls} max-w-[160px]`} />
-                  <span className="text-xs text-muted-foreground">Tarif moyen en France : 0,21 €/kWh</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max="5"
+                    value={prixKwh}
+                    onChange={e => {
+                      // BugID_017/025 — chiffres + un seul "." ; max 2 décimales ; pas de signe "-"
+                      const raw = e.target.value.replace(",", ".");
+                      if (raw === "") { setPrixKwh(""); return; }
+                      if (!/^\d*(\.\d{0,2})?$/.test(raw)) return;
+                      setPrixKwh(raw);
+                    }}
+                    onBlur={() => {
+                      // Re-formate sur perte de focus : 0.185 → 0.19, "abc" → reset à 0.21
+                      const f = parseFloat(prixKwh);
+                      if (!isFinite(f) || f <= 0) { setPrixKwh("0.21"); return; }
+                      setPrixKwh(f.toFixed(2));
+                    }}
+                    inputMode="decimal"
+                    className={`${inputCls} max-w-[160px]`}
+                  />
+                  <span className="text-xs text-muted-foreground">Tarif moyen en France : 0,21 €/kWh — strictement positif, ≤ 5</span>
                 </div>
               </div>
 

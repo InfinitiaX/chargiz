@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
-import { User, Car, Shield, Save, MapPin, Navigation, Search, Loader2, CheckCircle2 } from "lucide-react";
+import { AlertCircle, User, Car, Shield, Save, MapPin } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/mes-infos")({
   component: MesInfosPage,
@@ -29,12 +30,6 @@ function MesInfosPage() {
   const [form, setForm] = useState({ nom: "", prenom: "", telephone: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Domicile
-  const [addressInput, setAddressInput] = useState("");
-  const [searchResult, setSearchResult] = useState<{ display_name: string; lat: number; lon: number } | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [savingHome, setSavingHome] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -70,59 +65,6 @@ function MesInfosPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const nominatimSearch = async (query: string) => {
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`, { headers: { "Accept-Language": "fr" } });
-      const data = await res.json();
-      return data[0] ?? null;
-    } catch { return null; }
-  };
-
-  const saveHome = async (lat: number, lon: number, address: string) => {
-    if (!collaborateur) return;
-    setSavingHome(true);
-    try {
-      const updated = await api.collaborateurs.setHome(collaborateur.id, lat, lon, address);
-      setCollaborateur({ ...collaborateur, home_latitude: updated.latitude, home_longitude: updated.longitude, home_address: updated.address });
-      setSearchResult(null);
-      setAddressInput("");
-    } catch (e: any) {
-      alert("Erreur : " + (e.message ?? "inconnue"));
-    } finally {
-      setSavingHome(false);
-    }
-  };
-
-  const handleGPS = () => {
-    if (!navigator.geolocation) { alert("Géolocalisation non supportée."); return; }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        setLocating(false);
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`, { headers: { "Accept-Language": "fr" } });
-          const data = await res.json();
-          const address = data.display_name ?? `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
-          await saveHome(pos.coords.latitude, pos.coords.longitude, address);
-        } catch {
-          await saveHome(pos.coords.latitude, pos.coords.longitude, `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
-        }
-      },
-      err => { setLocating(false); alert("Position indisponible : " + err.message); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
-
-  const handleAddressSearch = async () => {
-    if (!addressInput.trim()) return;
-    setSearching(true);
-    setSearchResult(null);
-    const result = await nominatimSearch(addressInput.trim());
-    setSearching(false);
-    if (!result) { alert("Adresse non trouvée. Essayez d'être plus précis."); return; }
-    setSearchResult({ display_name: result.display_name, lat: parseFloat(result.lat), lon: parseFloat(result.lon) });
   };
 
   const jourActif = (bit: number) => {
@@ -245,72 +187,47 @@ function MesInfosPage() {
               Pour différencier les recharges domicile/extérieures, ChargiZ a besoin de connaître la position GPS de votre domicile.
               Cliquez sur le bouton ci-dessous depuis votre domicile.
             </p>
-            {/* Adresse actuelle */}
             {collaborateur.home_latitude && collaborateur.home_longitude && (
-              <div className="mb-4 rounded-lg bg-primary/5 border border-primary/10 p-3 space-y-0.5">
-                <p className="text-xs font-medium text-primary flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Domicile enregistré
-                </p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {collaborateur.home_address || `${collaborateur.home_latitude.toFixed(5)}, ${collaborateur.home_longitude.toFixed(5)}`}
-                </p>
-              </div>
+              <p className="text-xs text-muted-foreground mb-3 font-mono">
+                Position actuelle : {collaborateur.home_latitude.toFixed(5)}, {collaborateur.home_longitude.toFixed(5)}
+              </p>
             )}
-
-            {/* Option A — GPS */}
-            <div className="space-y-3">
-              <div className="rounded-xl border border-border p-4 space-y-2">
-                <p className="text-sm font-medium text-card-foreground">Option A — Je suis chez moi maintenant</p>
-                <button
-                  onClick={handleGPS}
-                  disabled={locating || savingHome}
-                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50"
-                >
-                  {locating || savingHome ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
-                  {locating ? "Localisation…" : savingHome ? "Enregistrement…" : collaborateur.home_latitude ? "Mettre à jour via GPS" : "Utiliser ma position GPS"}
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground">ou</span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-
-              {/* Option B — Adresse */}
-              <div className="rounded-xl border border-border p-4 space-y-3">
-                <p className="text-sm font-medium text-card-foreground">Option B — Saisir mon adresse</p>
-                <div className="flex gap-2">
-                  <input
-                    value={addressInput}
-                    onChange={e => setAddressInput(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && handleAddressSearch()}
-                    className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    placeholder="12 rue des Lilas, Paris"
-                  />
-                  <button
-                    onClick={handleAddressSearch}
-                    disabled={searching || !addressInput.trim()}
-                    className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
-                  >
-                    {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                  </button>
-                </div>
-                {searchResult && (
-                  <div className="rounded-lg bg-muted/50 p-3 space-y-2">
-                    <p className="text-xs text-muted-foreground leading-relaxed">📍 {searchResult.display_name}</p>
-                    <button
-                      onClick={() => saveHome(searchResult.lat, searchResult.lon, searchResult.display_name)}
-                      disabled={savingHome}
-                      className="flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50"
-                    >
-                      {savingHome ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-                      Confirmer cette adresse
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+            <button
+              onClick={() => {
+                if (!navigator.geolocation) {
+                  toast.error("Géolocalisation non supportée", {
+                    description: "Votre navigateur ne supporte pas la géolocalisation.",
+                    icon: <AlertCircle className="h-4 w-4" />,
+                    duration: 4000,
+                  });
+                  return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                  async pos => {
+                    try {
+                      const updated = await api.collaborateurs.setHome(collaborateur.id, pos.coords.latitude, pos.coords.longitude);
+                      setCollaborateur({ ...collaborateur, home_latitude: updated.latitude, home_longitude: updated.longitude });
+                    } catch (e: any) {
+                      toast.error("Mise à jour impossible", {
+                        description: e.message ?? "Erreur inconnue.",
+                        icon: <AlertCircle className="h-4 w-4" />,
+                        duration: 4000,
+                      });
+                    }
+                  },
+                  err => toast.error("Position inaccessible", {
+                    description: "Impossible de récupérer votre position : " + err.message,
+                    icon: <AlertCircle className="h-4 w-4" />,
+                    duration: 4000,
+                  }),
+                  { enableHighAccuracy: true, timeout: 10000 }
+                );
+              }}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light"
+            >
+              <MapPin className="h-4 w-4" />
+              {collaborateur.home_latitude ? "Mettre à jour ma position domicile" : "Définir ma position domicile"}
+            </button>
           </div>
         )}
 
@@ -419,7 +336,11 @@ function MesInfosPage() {
                     const res = await api.me.smartcarConnectUrl();
                     window.location.href = res.smartcar_auth_url;
                   } catch (e: any) {
-                    alert("Erreur : " + (e.message ?? "inconnue"));
+                    toast.error("Connexion Smartcar impossible", {
+                      description: e.message ?? "Erreur inconnue.",
+                      icon: <AlertCircle className="h-4 w-4" />,
+                      duration: 4000,
+                    });
                   }
                 }}
                 className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light"

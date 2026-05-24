@@ -3,8 +3,38 @@ import logoChargiz from "../assets/logo-chargiz.png";
 import loginHero from "../assets/login-hero.jpg";
 // Force refresh to fix hydration mismatch and 404
 import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+
+function friendlyError(raw: string): { title: string; description?: string } {
+  const msg = raw.toLowerCase();
+  // Handle both new French backend messages and legacy English ones
+  if (msg.includes("désactivé") || msg.includes("inactive") || msg.includes("not active")) {
+    return {
+      title: "Votre compte est désactivé",
+      description: "Si vous pensez qu'il s'agit d'une erreur, contactez votre administrateur ou écrivez-nous à support@chargiz.io",
+    };
+  }
+  if (
+    msg.includes("email ou mot de passe incorrect") ||
+    msg.includes("incorrect") ||
+    msg.includes("invalid") ||
+    msg.includes("wrong") ||
+    msg.includes("identifiants")
+  ) {
+    return { title: "Email ou mot de passe incorrect" };
+  }
+  if (msg.includes("not found") || msg.includes("no user")) {
+    return { title: "Aucun compte trouvé avec cet email" };
+  }
+  if (msg.includes("trop de tentatives")) {
+    return {
+      title: "Trop de tentatives",
+      description: raw,
+    };
+  }
+  return { title: raw };
+}
 
 export const Route = createFileRoute("/")({
   component: LoginPage,
@@ -32,8 +62,13 @@ function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      await signIn(email, password);
-      navigate({ to: "/dashboard" });
+      const result = await signIn(email, password);
+      // BugID_001 — si mot de passe temporaire, force le changement avant tout accès
+      if (result?.user?.password_change_required) {
+        navigate({ to: "/force-password-change" });
+      } else {
+        navigate({ to: "/dashboard" });
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur de connexion");
     } finally {
@@ -46,7 +81,7 @@ function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("https://api.plateforme-test-infinitiax.com/api/auth/forgot-password", {
+      const response = await fetch("https://api.chargiz.io/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -112,14 +147,33 @@ function LoginPage() {
             </p>
           </div>
 
-          {error && (
-            <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
-          )}
+          {error && (() => {
+            const { title, description } = friendlyError(error);
+            return (
+              <div className="rounded-lg border border-destructive/20 bg-destructive/8 p-4 flex gap-3">
+                <TriangleAlert className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-medium text-destructive">{title}</p>
+                  {description && (
+                    <p className="text-xs text-destructive/80 leading-relaxed">{description}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {forgotSent ? (
-            <div className="rounded-lg bg-chargiz-teal/10 p-4 text-center">
-              <p className="text-sm text-chargiz-teal font-medium">Email envoyé ! Vérifiez votre boîte mail.</p>
-              <button onClick={() => { setForgotMode(false); setForgotSent(false); }} className="mt-3 text-sm text-primary hover:underline">Retour à la connexion</button>
+            <div className="rounded-lg bg-chargiz-teal/10 border border-chargiz-teal/30 p-4">
+              {/* Message neutre — anti-énumération d'emails (ne révèle pas si le compte existe) */}
+              <p className="text-sm text-chargiz-teal font-semibold text-center">
+                Demande prise en compte
+              </p>
+              <p className="mt-2 text-sm text-foreground/80 leading-relaxed text-center">
+                Si un compte est associé à cette adresse email, vous recevrez un lien de réinitialisation.
+              </p>
+              <button onClick={() => { setForgotMode(false); setForgotSent(false); }} className="mt-4 w-full text-sm text-primary hover:underline text-center">
+                Retour à la connexion
+              </button>
             </div>
           ) : forgotMode ? (
             <form className="space-y-5" onSubmit={handleForgotPassword}>

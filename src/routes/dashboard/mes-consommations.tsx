@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Calendar, Download } from "lucide-react";
-import { exportJustificatifPDF, exportCSV } from "@/lib/export";
+import { exportJustificatifPDF, exportXLSX } from "@/lib/export";
 
 export const Route = createFileRoute("/dashboard/mes-consommations")({
   component: MesConsommationsPage,
@@ -19,6 +19,7 @@ interface Session {
   cout_euro: number | null;
   is_domicile: boolean | null;
   vehicule_id: string;
+  kilometrage: number | null;
 }
 
 interface Vehicule {
@@ -78,21 +79,22 @@ function MesConsommationsPage() {
           </div>
           <button
             onClick={() =>
-              exportCSV(
-                `consommations_${dateFrom}_${dateTo}`,
+              exportXLSX(
+                `ChargiZ_Mes_Consommations_${dateFrom}_${dateTo}`,
                 sessions.map(s => ({
-                  Date: s.date_session ? new Date(s.date_session).toLocaleDateString("fr-FR") : "",
-                  Jour: getJour(s.date_session),
-                  Lieu: s.is_domicile ? "Domicile" : "Bureau/Public",
-                  "Kilométrage (km)": "",
+                  "Date": s.date_session ? new Date(s.date_session).toLocaleDateString("fr-FR") : "",
+                  "Jour": getJour(s.date_session),
+                  "Lieu": s.is_domicile ? "Domicile" : "Bureau/Public",
+                  "Kilométrage (km)": s.kilometrage ?? "",
                   "Énergie (kWh)": s.energie_kwh ?? "",
                   "Coût (€)": s.cout_euro ?? "",
-                }))
+                })),
+                `Sessions ${dateFrom} → ${dateTo}`,
               )
             }
             className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
           >
-            <Download className="h-4 w-4" /> Exporter CSV
+            <Download className="h-4 w-4" /> Export Excel
           </button>
           <button
             onClick={() =>
@@ -107,7 +109,7 @@ function MesConsommationsPage() {
                   jour_semaine: getJour(s.date_session),
                   energie_kwh: s.energie_kwh,
                   cout_euro: s.cout_euro,
-                  kilometrage: null,
+                  kilometrage: s.kilometrage ?? null,
                   is_domicile: s.is_domicile,
                 })),
               })
@@ -157,7 +159,9 @@ function MesConsommationsPage() {
                         {s.is_domicile ? "Domicile" : "Bureau / Public"}
                       </span>
                     </td>
-                    <td className="px-6 py-3 text-right text-muted-foreground text-xs italic">Smartcar</td>
+                    <td className="px-6 py-3 text-right text-card-foreground">
+                    {s.kilometrage ? s.kilometrage.toLocaleString("fr-FR") + " km" : <span className="text-muted-foreground text-xs italic">—</span>}
+                  </td>
                     <td className="px-6 py-3 text-right text-card-foreground">
                       {s.energie_kwh?.toFixed(2) ?? "0"} kWh
                     </td>

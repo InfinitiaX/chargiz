@@ -1,9 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { api, onDataChanged } from "@/lib/api";
+import { api, apiFetch, onDataChanged } from "@/lib/api";
 import { useAuth, type AppRole } from "@/hooks/useAuth";
 import KpiCard from "@/components/KpiCard";
+import PageSkeleton from "@/components/PageSkeleton";
+import SectionHeader from "@/components/SectionHeader";
+import DateRangeFilter, { isDateRangeValid } from "@/components/DateRangeFilter";
+import TablePagination from "@/components/TablePagination";
 import CreateCollaborateurDialog from "@/components/CreateCollaborateurDialog";
+import { exportXLSX } from "@/lib/export";
 import { Link } from "@tanstack/react-router";
 import { Zap, Battery, Home, MapPin, Calendar, Plus, Download, Search, Users, Car, Building2, Euro, AlertTriangle, TrendingUp, Leaf, Eye } from "lucide-react";
 
@@ -21,23 +26,17 @@ function DashboardHome() {
   const { role, profile } = useAuth();
 
   if (!role || !profile) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse text-muted-foreground">Chargement du tableau de bord...</div>
-      </div>
-    );
+    return <PageSkeleton kpiCount={4} rowCount={6} />;
   }
 
   switch (role) {
     case "superadmin": return <SuperAdminDashboard />;
+    // L'admin a une vue similaire au superadmin mais limitée aux entreprises
+    // qui lui sont attribuées (filtrage automatique côté backend via /api/entreprises).
+    case "admin": return <SuperAdminDashboard />;
     case "gestionnaire_entreprise": return <GestEntrepriseDashboard />;
-    // [Lot 2] dedicated scoped dashboards for filiale/site managers.
-    // For Lot 1, fall back to the entreprise dashboard so existing test accounts keep working.
-    case "gestionnaire_filiale":
-    case "gestionnaire_site":
-      return <GestEntrepriseDashboard />;
-    // case "gestionnaire_filiale": return <ScopedManagerDashboard scope="filiale" />;
-    // case "gestionnaire_site": return <ScopedManagerDashboard scope="site" />;
+    case "gestionnaire_filiale": return <ScopedManagerDashboard scope="filiale" />;
+    case "gestionnaire_site": return <ScopedManagerDashboard scope="site" />;
     case "collaborateur": return <ConducteurDashboard />;
     default: return <div className="p-8 text-muted-foreground">Rôle non reconnu.</div>;
   }
@@ -59,6 +58,8 @@ function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
   const [sites, setSites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [scopedPage, setScopedPage] = useState(1);
+  const SCOPED_PAGE_SIZE = 10;
   const [showAddCollab, setShowAddCollab] = useState(false);
 
   useEffect(() => {
@@ -74,7 +75,7 @@ function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
       const filter = { [filterKey]: scopeId } as Record<string, string>;
 
       const [collData, vehData, sessData] = await Promise.all([
-        api.collaborateurs.list(filter),
+        api.collaborateurs.list({ ...filter, active_only: "true" }),  // BugID_013
         api.vehicules.list(filter),
         api.sessions.list(filter).catch(() => [] as any[]),
       ]);
@@ -112,25 +113,27 @@ function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <PageSkeleton kpiCount={4} rowCount={6} />;
   }
 
-  // KPI calc
-  const energieTotale = sessions.reduce((a, s) => a + (s.energie_kwh || 0), 0);
-  const energieDomicile = sessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
-  const coutTotal = sessions.reduce((a, s) => a + (s.cout_euro || 0), 0);
-  const coutRemboursable = sessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.cout_euro || 0), 0);
-  const nbSessionsDomicile = sessions.filter(s => s.is_domicile).length;
+  // KPI calc — on ne compte que les sessions des collabs effectivement visibles
+  // (cohérence KPI ↔ tableau : la somme des colonnes dom + hors dom = Énergie totale)
+  const visibleCollabIds = new Set(collabs.map(c => c.id));
+  const scopedSessions = sessions.filter(s => visibleCollabIds.has(s.collaborateur_id));
+  const energieTotale = scopedSessions.reduce((a, s) => a + (s.energie_kwh || 0), 0);
+  const energieDomicile = scopedSessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
+  const coutTotal = scopedSessions.reduce((a, s) => a + (s.cout_euro || 0), 0);
+  const coutRemboursable = scopedSessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.cout_euro || 0), 0);
+  const nbSessionsDomicile = scopedSessions.filter(s => s.is_domicile).length;
 
   const filtered = collabs.filter(c =>
     !search || `${c.nom} ${c.prenom} ${c.email || ""}`.toLowerCase().includes(search.toLowerCase())
   );
 
-  const tableData = filtered.map(c => {
+  const scopedTotalPages = Math.ceil(filtered.length / SCOPED_PAGE_SIZE);
+  const scopedPaginatedCollabs = filtered.slice((scopedPage - 1) * SCOPED_PAGE_SIZE, scopedPage * SCOPED_PAGE_SIZE);
+
+  const tableData = scopedPaginatedCollabs.map(c => {
     const v = vehicules.find(v => v.collaborateur_id === c.id);
     const cSessions = sessions.filter(s => s.collaborateur_id === c.id);
     const rechDomKwh = cSessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
@@ -152,27 +155,48 @@ function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
 
   return (
     <div className="p-4 sm:p-6 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-          {scopeLabel} — {scopeName}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Pilotage de la flotte et des consommations de votre {scope === "filiale" ? "filiale" : "site"}
-        </p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+            {scopeLabel} — {scopeName}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Pilotage de la flotte et des consommations de votre {scope === "filiale" ? "filiale" : "site"}
+          </p>
+        </div>
+        {/* BugID_033 — Export Excel (Scoped Filiale/Site) */}
+        <button
+          onClick={() => exportXLSX(`ChargiZ_${scopeLabel}_${(scopeName || "").replace(/[^a-zA-Z0-9]+/g, "_")}`, tableData.map(r => ({
+            "Prénom": r.prenom,
+            "Nom": r.nom,
+            "Immatriculation": r.immatriculation,
+            "Rech. Dom (kWh)": Number(r.rechDomKwh.toFixed(2)),
+            "Rech. Dom (€)": Number(r.rechDomEuro.toFixed(2)),
+            "Rech. Hors (kWh)": Number(r.rechHorsDom.toFixed(2)),
+            "Km": r.km != null ? Number((r.km as number).toFixed(0)) : "—",
+            "Conso. moy. (kWh/100km)": r.conso != null ? Number((r.conso as number).toFixed(1)) : "—",
+            "CO₂ évité (kg)": r.co2 != null ? Number((r.co2 as number).toFixed(0)) : "—",
+          })), `${scopeLabel} ${scopeName}`)}
+          className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors self-start"
+          title="Télécharger un fichier Excel (.xlsx) des collaborateurs du périmètre"
+        >
+          <Download className="h-4 w-4" /> Export Excel
+        </button>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard title="Collaborateurs" value={String(collabs.length)} icon={Users} colorClass="bg-kpi-home/10 text-kpi-home" />
-        <KpiCard title="Véhicules" value={String(vehicules.length)} icon={Car} colorClass="bg-kpi-energy/10 text-kpi-energy" />
-        <KpiCard title="Recharges (période)" value={String(sessions.length)} icon={Zap} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
-        <KpiCard title="Énergie totale" value={`${energieTotale.toFixed(0)} kWh`} icon={Battery} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
+        <KpiCard title="Collaborateurs" value={String(collabs.length)} icon={Users} tone="neutral" />
+        <KpiCard title="Véhicules" value={String(vehicules.length)} icon={Car} tone="neutral" />
+        <KpiCard title="Recharges (période)" value={String(sessions.length)} icon={Zap} tone="primary" />
+        <KpiCard title="Énergie totale" value={`${energieTotale.toFixed(2)} kWh`} icon={Battery} tone="primary" />
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard title="Recharges domicile" value={String(nbSessionsDomicile)} icon={Home} colorClass="bg-kpi-home/10 text-kpi-home" />
-        <KpiCard title="Énergie domicile" value={`${energieDomicile.toFixed(0)} kWh`} icon={Leaf} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
-        <KpiCard title="Coût total" value={`${coutTotal.toFixed(2)} €`} icon={Euro} colorClass="bg-kpi-away/10 text-kpi-away" />
-        <KpiCard title="À rembourser" value={`${coutRemboursable.toFixed(2)} €`} icon={Euro} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
+        <KpiCard title="Recharges domicile" value={String(nbSessionsDomicile)} icon={Home} tone="accent" />
+        {/* BugID_021 — format décimal 2 chiffres */}
+        <KpiCard title="Énergie domicile" value={`${energieDomicile.toFixed(2)} kWh`} icon={Leaf} tone="accent" />
+        <KpiCard title="Coût total" value={`${coutTotal.toFixed(2)} €`} icon={Euro} tone="primary" />
+        <KpiCard title="À rembourser" value={`${coutRemboursable.toFixed(2)} €`} icon={Euro} tone="accent" />
       </div>
 
       {scope === "filiale" && (
@@ -222,7 +246,7 @@ function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
         </button>
         <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input type="text" placeholder="Rechercher un collaborateur..." value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="Rechercher un collaborateur..." value={search} onChange={e => { setSearch(e.target.value); setScopedPage(1); }}
             className="w-full sm:w-64 rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
         </div>
       </div>
@@ -249,7 +273,7 @@ function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
             <tbody>
               {tableData.length === 0 ? (
                 <tr><td colSpan={10} className="px-6 py-8 text-center text-muted-foreground">Aucun collaborateur</td></tr>
-              ) : tableData.slice(0, 15).map(c => (
+              ) : tableData.map(c => (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 whitespace-nowrap">
                   <td className="px-6 py-3 font-medium text-card-foreground">{c.prenom}</td>
                   <td className="px-6 py-3 font-medium text-card-foreground">{c.nom}</td>
@@ -271,6 +295,14 @@ function ScopedManagerDashboard({ scope }: { scope: "filiale" | "site" }) {
           </table>
         </div>
       </div>
+
+      <TablePagination
+        page={scopedPage}
+        totalPages={scopedTotalPages}
+        totalItems={filtered.length}
+        pageSize={SCOPED_PAGE_SIZE}
+        onPageChange={setScopedPage}
+      />
 
       {profile?.entreprise_id && (
         <CreateCollaborateurDialog
@@ -308,7 +340,7 @@ function SuperAdminDashboard() {
   const [dateFrom, setDateFrom] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); d.setDate(1); return d.toISOString().slice(0, 10); });
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
 
-  useEffect(() => { loadData(); }, [dateFrom, dateTo]);
+  useEffect(() => { if (isDateRangeValid(dateFrom, dateTo)) loadData(); }, [dateFrom, dateTo]);
   useEffect(() => {
     const onFocus = () => loadData();
     window.addEventListener("focus", onFocus);
@@ -323,13 +355,16 @@ function SuperAdminDashboard() {
   async function loadData() {
     setLoading(true);
     try {
+      // Dashboard SuperAdmin : exclure systématiquement les entités archivées
+      // (entreprises, filiales, sites, collabs, véhicules + sessions d'entreprises archivées).
+      // L'archivage cascade via is_active=False sur chaque entité enfant.
       const [entData, filData, siteData, collData, vehData, sessData] = await Promise.all([
-        api.entreprises.list(),
-        api.filiales.list(),
-        api.sites.list(),
-        api.collaborateurs.list(),
-        api.vehicules.list(),
-        api.sessions.list(),
+        api.entreprises.list({ active_only: "true" }),
+        api.filiales.list({ active_only: "true" }),
+        api.sites.list({ active_only: "true" }),
+        api.collaborateurs.list({ active_only: "true" }),
+        api.vehicules.list({ active_only: "true" }),
+        api.sessions.list({ active_only: "true" }),
       ]);
 
       setEntreprises(entData);
@@ -390,11 +425,7 @@ function SuperAdminDashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <PageSkeleton kpiCount={4} rowCount={6} />;
   }
 
   return (
@@ -404,39 +435,43 @@ function SuperAdminDashboard() {
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Plateforme ChargiZ</h1>
           <p className="mt-1 text-sm text-muted-foreground">Vue globale multi-entreprises — SuperAdmin</p>
         </div>
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-transparent text-xs outline-none" />
-          <span className="text-xs text-muted-foreground">→</span>
-          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-transparent text-xs outline-none" />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} />
+          {/* BugID_033 — Export Excel (SuperAdmin) */}
+          <button
+            onClick={() => exportXLSX(`ChargiZ_SuperAdmin_${dateFrom}_${dateTo}`, topEntreprises.map(e => ({
+              "Entreprise": e.nom,
+              "Sessions": e.nbSessions,
+              "Énergie totale (kWh)": Number(e.energieTotal.toFixed(2)),
+              "Coût total (€)": Number(e.coutTotal.toFixed(2)),
+            })), `Période ${dateFrom} → ${dateTo}`)}
+            className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            title="Télécharger un fichier Excel (.xlsx) des entreprises filtrées sur la période"
+          >
+            <Download className="h-4 w-4" /> Export Excel
+          </button>
         </div>
       </div>
 
       {/* Plateforme — comptes globaux (indépendants de la période) */}
-      <div className="mb-2 flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Organisation</span>
-        <div className="flex-1 h-px bg-border" />
-      </div>
+      <SectionHeader>Organisation</SectionHeader>
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <KpiCard title="Entreprises" value={String(stats.entreprises)} icon={Building2} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
-        <KpiCard title="Filiales" value={String(stats.filiales)} icon={Building2} colorClass="bg-kpi-energy/10 text-kpi-energy" />
-        <KpiCard title="Sites" value={String(stats.sites)} icon={MapPin} colorClass="bg-kpi-away/10 text-kpi-away" />
-        <KpiCard title="Conducteurs" value={String(stats.conducteurs)} icon={Users} colorClass="bg-kpi-home/10 text-kpi-home" />
-        <KpiCard title="Véhicules" value={String(stats.vehicules)} icon={Car} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
+        <KpiCard title="Entreprises" value={String(stats.entreprises)} icon={Building2} tone="primary" />
+        <KpiCard title="Filiales" value={String(stats.filiales)} icon={Building2} tone="neutral" />
+        <KpiCard title="Sites" value={String(stats.sites)} icon={MapPin} tone="neutral" />
+        <KpiCard title="Conducteurs" value={String(stats.conducteurs)} icon={Users} tone="neutral" />
+        <KpiCard title="Véhicules" value={String(stats.vehicules)} icon={Car} tone="neutral" />
       </div>
 
       {/* Activité de recharge — sur la période sélectionnée */}
-      <div className="mb-2 flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Activité de recharge (période)</span>
-        <div className="flex-1 h-px bg-border" />
-      </div>
+      <SectionHeader>Activité de recharge sur la période</SectionHeader>
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        <KpiCard title="Sessions" value={String(stats.nbSessions)} icon={Zap} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
-        <KpiCard title="Sessions domicile" value={String(stats.nbSessionsDomicile)} icon={Home} colorClass="bg-kpi-home/10 text-kpi-home" />
-        <KpiCard title="Énergie totale" value={`${stats.energieTotal.toFixed(0)} kWh`} icon={Battery} colorClass="bg-kpi-energy/10 text-kpi-energy" />
-        <KpiCard title="Énergie domicile" value={`${stats.energieDomicile.toFixed(0)} kWh`} icon={Leaf} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
-        <KpiCard title="Coût total" value={`${stats.coutTotal.toFixed(2)} €`} icon={Euro} colorClass="bg-kpi-away/10 text-kpi-away" />
-        <KpiCard title="À rembourser" value={`${stats.coutRemboursable.toFixed(2)} €`} icon={Euro} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
+        <KpiCard title="Sessions" value={String(stats.nbSessions)} icon={Zap} tone="primary" />
+        <KpiCard title="Sessions domicile" value={String(stats.nbSessionsDomicile)} icon={Home} tone="accent" />
+        <KpiCard title="Énergie totale" value={`${stats.energieTotal.toFixed(2)} kWh`} icon={Battery} tone="primary" />
+        <KpiCard title="Énergie domicile" value={`${stats.energieDomicile.toFixed(2)} kWh`} icon={Leaf} tone="accent" />
+        <KpiCard title="Coût total" value={`${stats.coutTotal.toFixed(2)} €`} icon={Euro} tone="primary" />
+        <KpiCard title="À rembourser" value={`${stats.coutRemboursable.toFixed(2)} €`} icon={Euro} tone="accent" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -546,10 +581,17 @@ function GestEntrepriseDashboard() {
   const [collabs, setCollabs] = useState<any[]>([]);
   const [vehicules, setVehicules] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
+  const [kpisByCollab, setKpisByCollab] = useState<Record<string, { conso: number | null; co2: number | null; km: number | null }>>({});
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
   const [showAddCollab, setShowAddCollab] = useState(false);
 
-  useEffect(() => { if (entrepriseId) loadData(); }, [entrepriseId]);
+  // Filtre de date (CDC §6.1.3.2)
+  const [dateFrom, setDateFrom] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); d.setDate(1); return d.toISOString().slice(0, 10); });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+
+  useEffect(() => { if (entrepriseId && isDateRangeValid(dateFrom, dateTo)) loadData(); }, [entrepriseId, dateFrom, dateTo]);
   useEffect(() => {
     const onFocus = () => { if (entrepriseId) loadData(); };
     window.addEventListener("focus", onFocus);
@@ -563,64 +605,84 @@ function GestEntrepriseDashboard() {
 
   async function loadData() {
     try {
-      const [collData, vehData, sessData] = await Promise.all([
-        api.collaborateurs.list({ entreprise_id: entrepriseId }),
+      const [collDataRaw, vehData, sessData] = await Promise.all([
+        api.collaborateurs.list({ entreprise_id: entrepriseId, active_only: "true" }),  // BugID_013 : exclure archivés du tableau opérationnel
         api.vehicules.list({ entreprise_id: entrepriseId }),
         api.sessions.list({ entreprise_id: entrepriseId }),
       ]);
-      
+      const collData = collDataRaw;
+
+      // Filtre les sessions par date
+      const fromTs = dateFrom + "T00:00:00";
+      const toTs = dateTo + "T23:59:59";
+      const dateFilteredSessions = sessData.filter(s => {
+        const d = s.date_session || s.date_debut;
+        return d && d >= fromTs && d <= toTs;
+      });
+
+      // Cohérence KPI ↔ tableau : on ne compte que les sessions rattachées à un
+      // collaborateur effectivement présent dans la liste (évite les orphelins
+      // après suppression). Comme ça la somme des colonnes du tableau =
+      // Énergie totale du KPI exactement.
+      const visibleCollabIds = new Set(collData.map((c: any) => c.id));
+      const filteredSessions = dateFilteredSessions.filter(s => visibleCollabIds.has(s.collaborateur_id));
+
       setCollabs(collData);
       setVehicules(vehData);
-      setSessions(sessData);
-      
-      const statsData = await api.stats.get(entrepriseId).catch(() => null);
-      if (statsData) {
-        const energieDomicile = sessData.filter(s => s.is_domicile).reduce((acc, s) => acc + (s.energie_kwh || 0), 0);
-        setStats({
-          collaborateurs: statsData.nb_collaborateurs,
-          vehicules: statsData.nb_vehicules,
-          energieTotal: statsData.energie_totale_kwh,
-          coutRemboursable: statsData.cout_total_euro,
-          nbSessions: statsData.nb_sessions,
-          nbSessionsDomicile: statsData.sessions_domicile,
-          energieDomicile: energieDomicile,
-        });
-      } else {
-        setStats(prev => ({ ...prev, collaborateurs: collData.length, vehicules: vehData.length }));
-      }
+      setSessions(filteredSessions);
+
+      // Stats agrégés sur la période (= somme exacte des colonnes du tableau)
+      const energieTotal = filteredSessions.reduce((a, s) => a + (s.energie_kwh || 0), 0);
+      const energieDomicile = filteredSessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.energie_kwh || 0), 0);
+      const coutRemboursable = filteredSessions.filter(s => s.is_domicile).reduce((a, s) => a + (s.cout_euro || 0), 0);
+
+      setStats({
+        collaborateurs: collData.length,
+        vehicules: vehData.length,
+        nbSessions: filteredSessions.length,
+        nbSessionsDomicile: filteredSessions.filter(s => s.is_domicile).length,
+        energieTotal,
+        energieDomicile,
+        coutRemboursable,
+      });
+
+      // Charge les KPIs réels (conso/CO2/km) pour chaque collaborateur en parallèle
+      const kpisResults = await Promise.all(
+        collData.map(async (c: any) => {
+          try {
+            const kpi = await apiFetch<any>(
+              `/api/collaborateurs/${c.id}/kpis?date_from=${dateFrom}&date_to=${dateTo}`
+            );
+            return [c.id, {
+              conso: kpi.conso_moyenne_kwh_100km,
+              co2: kpi.co2_evite_kg,
+              km: kpi.dernier_km,
+            }] as const;
+          } catch {
+            return [c.id, { conso: null, co2: null, km: null }] as const;
+          }
+        })
+      );
+      setKpisByCollab(Object.fromEntries(kpisResults));
     } catch (err) {
       console.error("Error loading dashboard data:", err);
     }
   }
 
   const filtered = collabs.filter(c => !search || `${c.nom} ${c.prenom}`.toLowerCase().includes(search.toLowerCase()));
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginatedCollabs = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Compute stats per collaborator
-  const tableData = filtered.map(c => {
+  // Compute stats per collaborator (sur la page courante uniquement, pour économiser le rendu)
+  const tableData = paginatedCollabs.map(c => {
     const v = vehicules.find(v => v.collaborateur_id === c.id);
     const cSessions = sessions.filter(s => s.collaborateur_id === c.id);
-    
+
     const rechDomKwh = cSessions.filter(s => s.is_domicile).reduce((acc, s) => acc + (s.energie_kwh || 0), 0);
     const rechDomEuro = cSessions.filter(s => s.is_domicile).reduce((acc, s) => acc + (s.cout_euro || 0), 0);
     const rechHorsDom = cSessions.filter(s => !s.is_domicile).reduce((acc, s) => acc + (s.energie_kwh || 0), 0);
 
-    // [Smartcar TODO] km / conso / CO2 require real odometer data — left null
-    // until Smartcar premium is wired. UI renders "—" instead of fake numbers.
-    const kilom: number | null = null;
-    const consoMoyenne: number | null = null;
-    const co2: number | null = null;
-
-    // Détection fraude : session "domicile" dont le GPS est loin du domicile déclaré (> 500m)
-    const suspiciousSessions = cSessions.filter(s => {
-      if (!s.is_domicile || !s.latitude || !s.longitude) return false;
-      if (!c.home_latitude || !c.home_longitude) return false;
-      const R = 6371000;
-      const dLat = (s.latitude - c.home_latitude) * Math.PI / 180;
-      const dLon = (s.longitude - c.home_longitude) * Math.PI / 180;
-      const a = Math.sin(dLat/2)**2 + Math.cos(c.home_latitude * Math.PI/180) * Math.cos(s.latitude * Math.PI/180) * Math.sin(dLon/2)**2;
-      const dist = 2 * R * Math.asin(Math.sqrt(a));
-      return dist > 500;
-    });
+    const kpi = kpisByCollab[c.id] || { conso: null, co2: null, km: null };
 
     return {
       id: c.id,
@@ -630,92 +692,115 @@ function GestEntrepriseDashboard() {
       rechDomKwh,
       rechDomEuro,
       rechHorsDom,
-      kilom,
-      consoMoyenne,
-      co2,
-      home_address: c.home_address || null,
-      home_updated_at: c.home_updated_at || null,
-      hasHome: !!c.home_latitude,
-      suspiciousCount: suspiciousSessions.length,
+      kilom: kpi.km,
+      consoMoyenne: kpi.conso,
+      co2: kpi.co2,
     };
   });
 
   return (
     <div className="p-4 sm:p-6 md:p-8">
-      <div className="mb-8 flex justify-between items-center">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Tableau de bord</h1>
           <p className="mt-1 text-sm text-muted-foreground">Pilotage de la flotte et des consommations</p>
         </div>
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm self-start sm:self-auto">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-transparent text-xs outline-none" />
+          <span className="text-xs text-muted-foreground">→</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-transparent text-xs outline-none" />
+        </div>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard title="Recharges (période)" value={String(stats.nbSessions)} icon={Zap} colorClass="bg-kpi-sessions/10 text-kpi-sessions" />
-        <KpiCard title="Recharges Domicile" value={String(stats.nbSessionsDomicile)} icon={Home} colorClass="bg-kpi-home/10 text-kpi-home" />
-        <KpiCard title="Énergie Totale" value={`${stats.energieTotal.toFixed(0)} kWh`} icon={Battery} colorClass="bg-kpi-energy/10 text-kpi-energy" />
-        <KpiCard title="Énergie Domicile" value={`${stats.energieDomicile.toFixed(0)} kWh`} icon={Leaf} colorClass="bg-chargiz-lime/20 text-chargiz-lime-dark" />
+        <KpiCard title="Recharges (période)" value={String(stats.nbSessions)} icon={Zap} tone="primary" />
+        <KpiCard title="Recharges domicile" value={String(stats.nbSessionsDomicile)} icon={Home} tone="accent" />
+        <KpiCard title="Énergie totale" value={`${stats.energieTotal.toFixed(2)} kWh`} icon={Battery} tone="primary" />
+        <KpiCard title="Énergie domicile" value={`${stats.energieDomicile.toFixed(2)} kWh`} icon={Leaf} tone="accent" />
       </div>
 
       <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <button onClick={() => setShowAddCollab(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:brightness-95">
-          <Plus className="h-4 w-4" /> Ajouter collaborateur
-        </button>
+        <div className="flex w-full sm:w-auto items-center gap-2">
+          <button onClick={() => setShowAddCollab(true)} className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:brightness-95">
+            <Plus className="h-4 w-4" /> Ajouter collaborateur
+          </button>
+          {/* BugID_033 — Export Excel depuis l'Accueil (toutes les données filtrées, pas juste la page) */}
+          <button
+            onClick={() => {
+              const fullRows = filtered.map(c => {
+                const v = vehicules.find(v => v.collaborateur_id === c.id);
+                const cSessions = sessions.filter(s => s.collaborateur_id === c.id);
+                const rechDomKwh = cSessions.filter(s => s.is_domicile).reduce((acc, s) => acc + (s.energie_kwh || 0), 0);
+                const rechDomEuro = cSessions.filter(s => s.is_domicile).reduce((acc, s) => acc + (s.cout_euro || 0), 0);
+                const rechHorsDom = cSessions.filter(s => !s.is_domicile).reduce((acc, s) => acc + (s.energie_kwh || 0), 0);
+                const kpi = kpisByCollab[c.id] || { conso: null, co2: null, km: null };
+                return {
+                  "Prénom": c.prenom,
+                  "Nom": c.nom,
+                  "Email": c.email || "—",
+                  "Immatriculation": v?.immatriculation || "—",
+                  "Rech. Dom (kWh)": Number(rechDomKwh.toFixed(2)),
+                  "Rech. Dom (€)": Number(rechDomEuro.toFixed(2)),
+                  "Rech. Hors (kWh)": Number(rechHorsDom.toFixed(2)),
+                  "Km": kpi.km != null ? Number(kpi.km.toFixed(0)) : "—",
+                  "Conso. moy. (kWh/100km)": kpi.conso != null ? Number(kpi.conso.toFixed(1)) : "—",
+                  "CO₂ évité (kg)": kpi.co2 != null ? Number(kpi.co2.toFixed(0)) : "—",
+                };
+              });
+              exportXLSX(`ChargiZ_Accueil_${dateFrom}_${dateTo}`, fullRows, `Période ${dateFrom} → ${dateTo}`);
+            }}
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            title="Télécharger un fichier Excel (.xlsx) avec les données du tableau filtrées sur la période sélectionnée"
+          >
+            <Download className="h-4 w-4" /> Export Excel
+          </button>
+        </div>
         <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input type="text" placeholder="Rechercher un membre..." value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="Rechercher un membre..." value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
             className="w-full sm:w-64 rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
         </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-card-foreground">Suivi des collaborateurs</h3>
+          <div>
+            <h3 className="text-lg font-semibold text-card-foreground">Suivi des collaborateurs</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {filtered.length} collaborateur{filtered.length > 1 ? "s" : ""}
+              {search && ` (filtré${filtered.length > 1 ? "s" : ""} sur ${collabs.length})`}
+            </p>
+          </div>
           <Link to="/dashboard/listes/collaborateurs" className="text-xs text-primary hover:underline font-medium">Gestion complète</Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-border bg-muted/50 whitespace-nowrap">
-              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Collaborateur</th>
-              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Domicile déclaré</th>
-              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Dom. (kWh)</th>
-              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Dom. (€)</th>
-              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Hors dom. (kWh)</th>
-              <th className="px-6 py-3 text-center font-medium text-muted-foreground">Fraude</th>
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Prénom</th>
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Nom</th>
+              <th className="px-6 py-3 text-left font-medium text-muted-foreground">Immatriculation</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Rech. Dom (kWh)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Rech. Dom (€)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Rech. Hors (kWh)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Km</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">Conso Moy. (kWh/100)</th>
+              <th className="px-6 py-3 text-right font-medium text-muted-foreground">CO₂ évité (kg)</th>
               <th className="px-6 py-3 text-right font-medium text-muted-foreground">Action</th>
             </tr></thead>
             <tbody>
-              {tableData.slice(0, 10).map(c => (
+              {tableData.map(c => (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 whitespace-nowrap">
-                  <td className="px-6 py-3">
-                    <p className="font-medium text-card-foreground">{c.prenom} {c.nom}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{c.immatriculation}</p>
-                  </td>
-                  <td className="px-6 py-3 max-w-[220px]">
-                    {c.hasHome ? (
-                      <div>
-                        <p className="text-xs text-card-foreground leading-snug line-clamp-2">{c.home_address || "Position GPS enregistrée"}</p>
-                        {c.home_updated_at && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            Mis à jour le {new Date(c.home_updated_at).toLocaleDateString("fr-FR")}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-amber-600 font-medium">⚠ Non défini</span>
-                    )}
-                  </td>
+                  <td className="px-6 py-3 font-medium text-card-foreground">{c.prenom}</td>
+                  <td className="px-6 py-3 font-medium text-card-foreground">{c.nom}</td>
+                  <td className="px-6 py-3 font-mono text-card-foreground">{c.immatriculation}</td>
                   <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomKwh.toFixed(1)}</td>
-                  <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomEuro.toFixed(2)} €</td>
+                  <td className="px-6 py-3 text-right text-card-foreground">{c.rechDomEuro.toFixed(2)}</td>
                   <td className="px-6 py-3 text-right text-card-foreground">{c.rechHorsDom.toFixed(1)}</td>
-                  <td className="px-6 py-3 text-center">
-                    {c.suspiciousCount > 0 ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
-                        <AlertTriangle className="h-3 w-3" /> {c.suspiciousCount} suspecte{c.suspiciousCount > 1 ? "s" : ""}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
+                  <td className="px-6 py-3 text-right text-muted-foreground">{c.kilom != null ? c.kilom.toFixed(0) : "—"}</td>
+                  <td className="px-6 py-3 text-right text-muted-foreground">{c.consoMoyenne != null ? c.consoMoyenne.toFixed(1) : "—"}</td>
+                  <td className="px-6 py-3 text-right text-muted-foreground">{c.co2 != null ? c.co2.toFixed(1) : "—"}</td>
                   <td className="px-6 py-3 text-right">
                     <Link to="/dashboard/collaborateur/$id" params={{ id: c.id }} className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium">
                       <Eye className="h-3 w-3" /> Fiche
@@ -723,11 +808,19 @@ function GestEntrepriseDashboard() {
                   </td>
                 </tr>
               ))}
-              {tableData.length === 0 && <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">Aucun collaborateur trouvé</td></tr>}
+              {tableData.length === 0 && <tr><td colSpan={10} className="px-6 py-8 text-center text-muted-foreground">Aucun collaborateur trouvé</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
+
+      <TablePagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={filtered.length}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
 
       {entrepriseId && <CreateCollaborateurDialog entrepriseId={entrepriseId} open={showAddCollab} onClose={() => setShowAddCollab(false)} onCreated={loadData} />}
     </div>
@@ -741,7 +834,6 @@ function ConducteurDashboard() {
   const { profile } = useAuth();
   const [vehicule, setVehicule] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
-  const [collaborateur, setCollaborateur] = useState<any>(null);
   const [stats, setStats] = useState({ energieTotal: 0, coutTotal: 0, energieDomicile: 0, coutRemboursable: 0, co2Evite: 0, km: 0, nbSessions: 0 });
   const now = new Date();
   const dateLabel = now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }).toUpperCase();
@@ -751,13 +843,11 @@ function ConducteurDashboard() {
   async function loadData() {
     if (!profile) return;
     try {
-      const [vehData, sessData, collabData] = await Promise.all([
+      const [vehData, sessData] = await Promise.all([
         api.vehicules.list(),
         api.sessions.list(),
-        api.collaborateurs.list(),
       ]);
       if (vehData.length > 0) setVehicule(vehData[0]);
-      if ((collabData as any[]).length > 0) setCollaborateur((collabData as any[])[0]);
       setSessions(sessData);
       const km = sessData.reduce((a: number, s: any) => a + (s.kilometrage || 0), 0);
       setStats({
@@ -780,18 +870,6 @@ function ConducteurDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* ── Alerte domicile non défini ────────────────────────────── */}
-      {collaborateur && !collaborateur.home_latitude && (
-        <div className="flex items-center justify-between gap-3 bg-amber-50 border-b border-amber-200 px-6 py-3">
-          <div className="flex items-center gap-2 text-amber-800 text-sm">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
-            <span><strong>Domicile non défini</strong> — vos recharges ne seront pas détectées comme remboursables.</span>
-          </div>
-          <a href="/dashboard/mes-infos" className="shrink-0 text-xs font-semibold text-amber-700 underline hover:text-amber-900">
-            Définir maintenant →
-          </a>
-        </div>
-      )}
       {/* ── Hero header ───────────────────────────────────────────── */}
       <div className="relative overflow-hidden border-b border-border bg-card px-6 py-8 sm:px-10 sm:py-10">
         {/* Subtle dot-grid background */}
@@ -840,8 +918,8 @@ function ConducteurDashboard() {
         <div className="mb-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {[
             { label: "Sessions", value: stats.nbSessions, unit: "", color: "border-kpi-sessions/50 text-kpi-sessions bg-kpi-sessions/5" },
-            { label: "Énergie totale", value: stats.energieTotal.toFixed(1), unit: "kWh", color: "border-kpi-energy/50 text-kpi-energy bg-kpi-energy/5" },
-            { label: "kWh domicile", value: stats.energieDomicile.toFixed(1), unit: "kWh", color: "border-kpi-home/50 text-kpi-home bg-kpi-home/5" },
+            { label: "Énergie totale", value: stats.energieTotal.toFixed(2), unit: "kWh", color: "border-kpi-energy/50 text-kpi-energy bg-kpi-energy/5" },
+            { label: "kWh domicile", value: stats.energieDomicile.toFixed(2), unit: "kWh", color: "border-kpi-home/50 text-kpi-home bg-kpi-home/5" },
             { label: "Remboursable", value: stats.coutRemboursable.toFixed(2), unit: "€", color: "border-chargiz-lime/50 text-chargiz-lime-dark bg-chargiz-lime/8" },
             { label: "CO₂ évité", value: stats.co2Evite.toFixed(0), unit: "kg", color: "border-kpi-sessions/50 text-kpi-sessions bg-kpi-sessions/5" },
             { label: "Km odomètre", value: stats.km > 0 ? stats.km.toLocaleString("fr-FR") : "—", unit: stats.km > 0 ? "km" : "", color: "border-kpi-away/50 text-kpi-away bg-kpi-away/5" },
@@ -917,7 +995,7 @@ function ConducteurDashboard() {
                   { label: "Batterie", value: vehicule.capacite_batterie ? `${vehicule.capacite_batterie} kWh` : "—" },
                   { label: "VIN", value: vehicule.vin ? vehicule.vin.slice(-8) + "…" : "—" },
                   { label: "Affectation", value: vehicule.statut_affectation === "affecte" ? "Affecté" : "Disponible" },
-                  { label: "Connexion", value: vehicule.statut_smartcar === "connecte" ? "Smartcar ✓" : "Déconnecté" },
+                  { label: "Connexion", value: vehicule.statut_smartcar === "connecte" ? "Smartcar connecté" : "Déconnecté" },
                 ].map(item => (
                   <div key={item.label}>
                     <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground">{item.label}</p>

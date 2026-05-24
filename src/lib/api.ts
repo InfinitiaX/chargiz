@@ -114,11 +114,20 @@ export async function apiFetch<T>(
 // Resource helpers
 export const api = {
   entreprises: {
-    list: () => apiFetch<any[]>("/api/entreprises"),
+    list: (params?: Record<string, string>) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiFetch<any[]>(`/api/entreprises${qs ? `?${qs}` : ""}`);
+    },
     get: (id: string) => apiFetch<any>(`/api/entreprises/${id}`),
     update: (id: string, data: any) =>
       apiFetch<any>(`/api/entreprises/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-    delete: (id: string) => apiFetch<any>(`/api/entreprises/${id}`, { method: "DELETE" }),
+    archive: (id: string) =>
+      apiFetch<any>(`/api/entreprises/${id}/archive`, { method: "PATCH" }),
+    unarchive: (id: string) =>
+      apiFetch<any>(`/api/entreprises/${id}/unarchive`, { method: "PATCH" }),
+    /** Hard delete avec cascade — superadmin uniquement. */
+    delete: (id: string) =>
+      apiFetch<any>(`/api/entreprises/${id}`, { method: "DELETE" }),
   },
   users: {
     list: (params?: Record<string, string>) => {
@@ -136,7 +145,10 @@ export const api = {
     get: (id: string) => apiFetch<any>(`/api/collaborateurs/${id}`),
     update: (id: string, data: any) => apiFetch<any>(`/api/collaborateurs/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     setHome: (id: string, latitude: number, longitude: number, address?: string) =>
-      apiFetch<any>(`/api/collaborateurs/${id}/home`, { method: "POST", body: JSON.stringify({ latitude, longitude, address: address ?? null }) }),
+      apiFetch<any>(`/api/collaborateurs/${id}/home`, {
+        method: "POST",
+        body: JSON.stringify({ latitude, longitude, address: address || null }),
+      }),
   },
   filiales: {
     list: (params?: Record<string, string>) => {
@@ -150,6 +162,10 @@ export const api = {
       apiFetch<any>(`/api/filiales/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     archive: (id: string) =>
       apiFetch<any>(`/api/filiales/${id}`, { method: "DELETE" }),
+    unarchive: (id: string) =>
+      apiFetch<any>(`/api/filiales/${id}/unarchive`, { method: "PATCH" }),
+    hardDelete: (id: string) =>
+      apiFetch<any>(`/api/filiales/${id}/hard`, { method: "DELETE" }),
   },
   sites: {
     list: (params?: Record<string, string>) => {
@@ -163,6 +179,38 @@ export const api = {
       apiFetch<any>(`/api/sites/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     archive: (id: string) =>
       apiFetch<any>(`/api/sites/${id}`, { method: "DELETE" }),
+    unarchive: (id: string) =>
+      apiFetch<any>(`/api/sites/${id}/unarchive`, { method: "PATCH" }),
+    hardDelete: (id: string) =>
+      apiFetch<any>(`/api/sites/${id}/hard`, { method: "DELETE" }),
+  },
+  vehicules_actions: {
+    historique: (id: string) =>
+      apiFetch<any>(`/api/vehicules/${id}/historique-affectations`),
+    sessions: (id: string) =>
+      apiFetch<any>(`/api/vehicules/${id}/sessions`),
+    batteryInfo: (id: string) =>
+      apiFetch<any>(`/api/vehicules/${id}/battery-info`),
+    affecter: (id: string, collaborateur_id: string) =>
+      apiFetch<any>(`/api/vehicules/${id}/affecter`, {
+        method: "POST", body: JSON.stringify({ collaborateur_id }),
+      }),
+    detacher: (id: string, continuer_abonnement: boolean) =>
+      apiFetch<any>(`/api/vehicules/${id}/detacher`, {
+        method: "POST", body: JSON.stringify({ continuer_abonnement }),
+      }),
+    suspendre: (id: string) =>
+      apiFetch<any>(`/api/vehicules/${id}/suspendre`, { method: "POST" }),
+    reactiver: (id: string) =>
+      apiFetch<any>(`/api/vehicules/${id}/reactiver`, { method: "POST" }),
+    archiver: (id: string) =>
+      apiFetch<any>(`/api/vehicules/${id}/archiver`, { method: "POST" }),
+    desarchiver: (id: string) =>
+      apiFetch<any>(`/api/vehicules/${id}/desarchiver`, { method: "POST" }),
+    revoquerCollab: (collab_id: string, payload: { vehicule_action: "sortir_flotte" | "garder"; abonnement_action: "continuer" | "suspendre" | null }) =>
+      apiFetch<any>(`/api/collaborateurs/${collab_id}/revoquer`, {
+        method: "POST", body: JSON.stringify(payload),
+      }),
   },
   vehicules: {
     list: (params?: Record<string, string>) => {
@@ -183,6 +231,27 @@ export const api = {
   },
   stats: {
     get: (entrepriseId: string) => apiFetch<any>(`/api/entreprises/${entrepriseId}/stats`),
+  },
+  admins: {
+    list: () => apiFetch<any[]>("/api/admins"),
+    create: (data: { email: string; full_name: string; username?: string }) =>
+      apiFetch<any>("/api/admins", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: { full_name?: string; is_active?: boolean }) =>
+      apiFetch<any>(`/api/admins/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    delete: (id: number) =>
+      apiFetch<any>(`/api/admins/${id}`, { method: "DELETE" }),
+    listEntreprises: (id: number) =>
+      apiFetch<any[]>(`/api/admins/${id}/entreprises`),
+    setEntreprises: (id: number, entreprise_ids: string[]) =>
+      apiFetch<any>(`/api/admins/${id}/entreprises`, {
+        method: "PUT",
+        body: JSON.stringify({ entreprise_ids }),
+      }),
+    mutation: (from_admin_id: number, to_admin_id: number) =>
+      apiFetch<any>("/api/admins/mutation", {
+        method: "POST",
+        body: JSON.stringify({ from_admin_id, to_admin_id }),
+      }),
   },
   politiques: {
     list: (params?: Record<string, string>) => {
