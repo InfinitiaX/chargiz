@@ -31,7 +31,6 @@ import { Route as DashboardReglagesRouteImport } from './routes/dashboard/reglag
 import { Route as DashboardMesInfosRouteImport } from './routes/dashboard/mes-infos'
 import { Route as DashboardMesConsommationsRouteImport } from './routes/dashboard/mes-consommations'
 import { Route as DashboardListesRouteImport } from './routes/dashboard/listes'
-import { Route as DashboardApiKeysRouteImport } from './routes/dashboard/api-keys'
 import { Route as DashboardAdministrationRouteImport } from './routes/dashboard/administration'
 import { Route as DashboardAdministrationIndexRouteImport } from './routes/dashboard/administration/index'
 import { Route as DashboardListesSitesRouteImport } from './routes/dashboard/listes/sites'
@@ -156,11 +155,6 @@ const DashboardListesRoute = DashboardListesRouteImport.update({
   path: '/listes',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardApiKeysRoute = DashboardApiKeysRouteImport.update({
-  id: '/api-keys',
-  path: '/api-keys',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardAdministrationRoute = DashboardAdministrationRouteImport.update({
   id: '/administration',
   path: '/administration',
@@ -247,7 +241,6 @@ export interface FileRoutesByFullPath {
   '/statistiques': typeof StatistiquesRoute
   '/vehicules': typeof VehiculesRoute
   '/dashboard/administration': typeof DashboardAdministrationRouteWithChildren
-  '/dashboard/api-keys': typeof DashboardApiKeysRoute
   '/dashboard/listes': typeof DashboardListesRouteWithChildren
   '/dashboard/mes-consommations': typeof DashboardMesConsommationsRoute
   '/dashboard/mes-infos': typeof DashboardMesInfosRoute
@@ -282,7 +275,6 @@ export interface FileRoutesByTo {
   '/sites': typeof SitesRoute
   '/statistiques': typeof StatistiquesRoute
   '/vehicules': typeof VehiculesRoute
-  '/dashboard/api-keys': typeof DashboardApiKeysRoute
   '/dashboard/listes': typeof DashboardListesRouteWithChildren
   '/dashboard/mes-consommations': typeof DashboardMesConsommationsRoute
   '/dashboard/mes-infos': typeof DashboardMesInfosRoute
@@ -320,7 +312,6 @@ export interface FileRoutesById {
   '/statistiques': typeof StatistiquesRoute
   '/vehicules': typeof VehiculesRoute
   '/dashboard/administration': typeof DashboardAdministrationRouteWithChildren
-  '/dashboard/api-keys': typeof DashboardApiKeysRoute
   '/dashboard/listes': typeof DashboardListesRouteWithChildren
   '/dashboard/mes-consommations': typeof DashboardMesConsommationsRoute
   '/dashboard/mes-infos': typeof DashboardMesInfosRoute
@@ -359,7 +350,6 @@ export interface FileRouteTypes {
     | '/statistiques'
     | '/vehicules'
     | '/dashboard/administration'
-    | '/dashboard/api-keys'
     | '/dashboard/listes'
     | '/dashboard/mes-consommations'
     | '/dashboard/mes-infos'
@@ -394,7 +384,6 @@ export interface FileRouteTypes {
     | '/sites'
     | '/statistiques'
     | '/vehicules'
-    | '/dashboard/api-keys'
     | '/dashboard/listes'
     | '/dashboard/mes-consommations'
     | '/dashboard/mes-infos'
@@ -431,7 +420,6 @@ export interface FileRouteTypes {
     | '/statistiques'
     | '/vehicules'
     | '/dashboard/administration'
-    | '/dashboard/api-keys'
     | '/dashboard/listes'
     | '/dashboard/mes-consommations'
     | '/dashboard/mes-infos'
@@ -628,13 +616,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardListesRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/api-keys': {
-      id: '/dashboard/api-keys'
-      path: '/api-keys'
-      fullPath: '/dashboard/api-keys'
-      preLoaderRoute: typeof DashboardApiKeysRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/dashboard/administration': {
       id: '/dashboard/administration'
       path: '/administration'
@@ -767,7 +748,6 @@ const DashboardListesRouteWithChildren = DashboardListesRoute._addFileChildren(
 
 interface DashboardRouteChildren {
   DashboardAdministrationRoute: typeof DashboardAdministrationRouteWithChildren
-  DashboardApiKeysRoute: typeof DashboardApiKeysRoute
   DashboardListesRoute: typeof DashboardListesRouteWithChildren
   DashboardMesConsommationsRoute: typeof DashboardMesConsommationsRoute
   DashboardMesInfosRoute: typeof DashboardMesInfosRoute
@@ -779,7 +759,6 @@ interface DashboardRouteChildren {
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAdministrationRoute: DashboardAdministrationRouteWithChildren,
-  DashboardApiKeysRoute: DashboardApiKeysRoute,
   DashboardListesRoute: DashboardListesRouteWithChildren,
   DashboardMesConsommationsRoute: DashboardMesConsommationsRoute,
   DashboardMesInfosRoute: DashboardMesInfosRoute,
