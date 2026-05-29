@@ -259,5 +259,134 @@ export const api = {
       return apiFetch<any[]>(`/api/politiques${qs ? `?${qs}` : ""}`);
     },
     save: (data: any) => apiFetch<any>(`/api/politiques`, { method: "POST", body: JSON.stringify(data) }),
-  }
+  },
+  webhooks: {
+    list: (params?: { entreprise_id?: string }) => {
+      const qs = params?.entreprise_id ? `?entreprise_id=${encodeURIComponent(params.entreprise_id)}` : "";
+      return apiFetch<WebhookSubscription[]>(`/api/webhooks/subscriptions${qs}`);
+    },
+    create: (data: { url: string; events: string[]; entreprise_id?: string }) =>
+      apiFetch<WebhookSubscriptionCreated>("/api/webhooks/subscriptions", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    toggle: (subId: string, entreprise_id?: string) => {
+      const qs = entreprise_id ? `?entreprise_id=${encodeURIComponent(entreprise_id)}` : "";
+      return apiFetch<WebhookSubscription>(`/api/webhooks/subscriptions/${subId}/toggle${qs}`, { method: "PATCH" });
+    },
+    delete: (subId: string, entreprise_id?: string) => {
+      const qs = entreprise_id ? `?entreprise_id=${encodeURIComponent(entreprise_id)}` : "";
+      return apiFetch<void>(`/api/webhooks/subscriptions/${subId}${qs}`, { method: "DELETE" });
+    },
+    deliveries: (subId: string, entreprise_id?: string) => {
+      const qs = entreprise_id ? `?entreprise_id=${encodeURIComponent(entreprise_id)}` : "";
+      return apiFetch<WebhookDelivery[]>(`/api/webhooks/subscriptions/${subId}/deliveries${qs}`);
+    },
+  },
+  apiKeys: {
+    list: (params?: { entreprise_id?: string }) => {
+      const qs = params?.entreprise_id
+        ? `?entreprise_id=${encodeURIComponent(params.entreprise_id)}`
+        : "";
+      return apiFetch<ApiKeyItem[]>(`/api/api-keys/${qs}`);
+    },
+    create: (data: {
+      name: string;
+      scopes: string[];
+      expires_at?: string | null;
+      entreprise_id?: string;
+    }) =>
+      apiFetch<ApiKeyCreated>("/api/api-keys/", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    revoke: (keyId: string, entreprise_id?: string) => {
+      const qs = entreprise_id
+        ? `?entreprise_id=${encodeURIComponent(entreprise_id)}`
+        : "";
+      return apiFetch<void>(`/api/api-keys/${keyId}${qs}`, { method: "DELETE" });
+    },
+    rotate: (keyId: string, entreprise_id?: string) => {
+      const qs = entreprise_id
+        ? `?entreprise_id=${encodeURIComponent(entreprise_id)}`
+        : "";
+      return apiFetch<ApiKeyCreated>(`/api/api-keys/${keyId}/rotate${qs}`, {
+        method: "POST",
+      });
+    },
+    usage: (params?: { entreprise_id?: string }) => {
+      const qs = params?.entreprise_id
+        ? `?entreprise_id=${encodeURIComponent(params.entreprise_id)}`
+        : "";
+      return apiFetch<ApiUsageStats>(`/api/api-keys/usage${qs}`);
+    },
+  },
 };
+
+// ─── Types clés API ────────────────────────────────────────────────────────────
+export interface ApiKeyItem {
+  id: string;
+  entreprise_id: string;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  is_active: boolean;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  expires_at: string | null;
+  rate_limit: number;
+  created_at: string;
+}
+
+export interface ApiKeyCreated extends ApiKeyItem {
+  key: string; // clé brute — retournée une seule fois
+}
+
+export interface WebhookSubscription {
+  id: string;
+  entreprise_id: string;
+  url: string;
+  events: string[];
+  is_active: boolean;
+  failure_count: number;
+  last_delivered_at: string | null;
+  created_at: string;
+}
+
+export interface WebhookSubscriptionCreated extends WebhookSubscription {
+  secret: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  subscription_id: string;
+  event_type: string;
+  http_status: number | null;
+  attempt: number;
+  delivered_at: string | null;
+  created_at: string;
+}
+
+export interface ApiUsageStats {
+  total_calls: number;
+  calls_today: number;
+  calls_7days: number;
+  calls_30days: number;
+  calls_by_day: { date: string; count: number }[];
+  calls_by_endpoint: {
+    endpoint: string;
+    count: number;
+    pct: number;
+    avg_response_ms: number | null;
+  }[];
+  calls_by_key: {
+    key_id: string;
+    name: string;
+    key_prefix: string;
+    count: number;
+    pct: number;
+    last_call: string | null;
+  }[];
+  active_keys_count: number;
+  error_rate_pct: number;
+}
