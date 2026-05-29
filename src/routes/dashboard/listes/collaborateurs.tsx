@@ -71,6 +71,7 @@ function ListeCollaborateurs() {
   const [includeArchived, setIncludeArchived] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<{ created: number; skipped: number; errors: { ligne: number; email: string; raison: string }[] } | null>(null);
   /** ID du collaborateur en cours de traitement (archive/unarchive). */
   const [processingId, setProcessingId] = useState<string | null>(null);
   /** Collaborateur ciblé par la suppression — ouvre l'AlertDialog. */
@@ -244,12 +245,17 @@ function ListeCollaborateurs() {
     reader.onload = async (event) => {
       const text = event.target?.result as string;
       try {
-        await apiFetch("/api/collaborateurs/import/csv", {
-          method: "POST",
-          body: JSON.stringify({ file_content: text }),
-        });
-        toast.success("Importation réussie");
-        loadData();
+        const result = await apiFetch<{ created: number; skipped: number; errors: { ligne: number; email: string; raison: string }[] }>(
+          "/api/collaborateurs/import/csv",
+          { method: "POST", body: JSON.stringify({ file_content: text }) }
+        );
+        setImportReport(result);
+        if (result.created > 0) {
+          toast.success(`${result.created} collaborateur${result.created > 1 ? "s" : ""} importé${result.created > 1 ? "s" : ""}`);
+          loadData();
+        } else {
+          toast.error("Aucun collaborateur importé", { description: "Vérifiez le rapport ci-dessous." });
+        }
       } catch (err) {
         console.error(err);
         toast.error("Erreur d'importation", {
@@ -260,7 +266,7 @@ function ListeCollaborateurs() {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     };
-    reader.readAsText(file);
+    reader.readAsText(file, "utf-8");
   };
 
   const filtered = collaborateurs.filter((collab) =>
@@ -315,6 +321,23 @@ function ListeCollaborateurs() {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+          <button
+            onClick={() => {
+              const bom = "﻿";
+              const header = "Nom,Prénom,Email,Téléphone\n";
+              const blob = new Blob([bom + header], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "template_import_collaborateurs.csv";
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+            title="Télécharger le modèle CSV vierge à remplir"
+          >
+            <Download className="h-4 w-4" /> Modèle CSV
+          </button>
           <button onClick={handleImportClick} disabled={importing} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
             <Upload className="h-4 w-4" /> {importing ? "Import..." : "Importer CSV"}
           </button>
@@ -347,6 +370,33 @@ function ListeCollaborateurs() {
           )}
         </div>
       </div>
+
+      {/* BugID_031/032 — Rapport d'import CSV */}
+      {importReport && (
+        <div className={`mb-6 rounded-xl border p-4 text-sm ${importReport.created > 0 ? "border-chargiz-teal/30 bg-chargiz-teal/5" : "border-destructive/30 bg-destructive/5"}`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold text-foreground mb-1">Rapport d'importation</p>
+              <p className="text-muted-foreground">
+                {importReport.created} créé{importReport.created > 1 ? "s" : ""}
+                {importReport.skipped > 0 && ` · ${importReport.skipped} ignoré${importReport.skipped > 1 ? "s" : ""} (doublon)`}
+                {importReport.errors.filter(e => !e.raison.startsWith("Email déjà")).length > 0 &&
+                  ` · ${importReport.errors.filter(e => !e.raison.startsWith("Email déjà")).length} erreur${importReport.errors.filter(e => !e.raison.startsWith("Email déjà")).length > 1 ? "s" : ""}`}
+              </p>
+              {importReport.errors.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {importReport.errors.map((e, i) => (
+                    <li key={i} className="text-xs text-destructive">
+                      Ligne {e.ligne}{e.email ? ` (${e.email})` : ""} — {e.raison}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <button onClick={() => setImportReport(null)} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">✕</button>
+          </div>
+        </div>
+      )}
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative w-full sm:max-w-md">

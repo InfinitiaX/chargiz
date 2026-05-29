@@ -140,17 +140,17 @@ export default function VehiculeSelector({ value, onChange, required = false, di
         </div>
         <div>
           <Label req={required}>Capacité batterie (kWh)</Label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            max="250"
+          <select
             className={inputCls}
             value={value.capacite_batterie ?? ""}
             onChange={e => onChange({ ...value, capacite_batterie: e.target.value ? parseFloat(e.target.value) : null })}
-            placeholder="60"
             disabled={disabled}
-          />
+          >
+            <option value="">— Sélectionner —</option>
+            {[16, 22, 27, 30, 38, 40, 41, 45, 50, 52, 54, 58, 60, 64, 66, 70, 75, 77, 82, 84, 90, 94, 99, 100, 107, 108].map(kwh => (
+              <option key={kwh} value={kwh}>{kwh} kWh</option>
+            ))}
+          </select>
           <p className="mt-1 text-[11px] text-muted-foreground">
             Smartcar pourra confirmer cette valeur lors de la connexion.
           </p>

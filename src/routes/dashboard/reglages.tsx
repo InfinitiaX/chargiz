@@ -445,30 +445,37 @@ function ReglagesPage() {
                     ? "Appliqué à toutes les recharges domicile remboursables."
                     : "Valeur par défaut héritée par les nouveaux collaborateurs (modifiable sur la fiche)."}
                 </p>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max="5"
-                    value={prixKwh}
-                    onChange={e => {
-                      // BugID_017/025 — chiffres + un seul "." ; max 2 décimales ; pas de signe "-"
-                      const raw = e.target.value.replace(",", ".");
-                      if (raw === "") { setPrixKwh(""); return; }
-                      if (!/^\d*(\.\d{0,2})?$/.test(raw)) return;
-                      setPrixKwh(raw);
-                    }}
-                    onBlur={() => {
-                      // Re-formate sur perte de focus : 0.185 → 0.19, "abc" → reset à 0.21
-                      const f = parseFloat(prixKwh);
-                      if (!isFinite(f) || f <= 0) { setPrixKwh("0.21"); return; }
-                      setPrixKwh(f.toFixed(2));
-                    }}
-                    inputMode="decimal"
-                    className={`${inputCls} max-w-[160px]`}
-                  />
-                  <span className="text-xs text-muted-foreground">Tarif moyen en France : 0,21 €/kWh — strictement positif, ≤ 5</span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={prixKwh}
+                      onChange={e => {
+                        const raw = e.target.value.replace(",", ".");
+                        if (raw === "" || raw === ".") { setPrixKwh(raw); return; }
+                        if (!/^\d*(\.\d{0,2})?$/.test(raw)) return;
+                        setPrixKwh(raw);
+                      }}
+                      onBlur={() => {
+                        const f = parseFloat(prixKwh);
+                        if (!isFinite(f) || f <= 0) {
+                          setPolStatus({ err: "Le coût du kWh doit être un nombre décimal strictement positif (ex : 0.18)." });
+                          setPrixKwh("0.21");
+                          return;
+                        }
+                        if (f > 5) {
+                          setPolStatus({ err: "Le coût du kWh doit être inférieur ou égal à 5 €/kWh." });
+                          setPrixKwh("5.00");
+                          return;
+                        }
+                        setPrixKwh(f.toFixed(2));
+                      }}
+                      placeholder="0.21"
+                      className={`${inputCls} max-w-[160px]`}
+                    />
+                    <span className="text-xs text-muted-foreground">€/kWh · positif · ≤ 5 · 2 décimales max</span>
+                  </div>
                 </div>
               </div>
 
