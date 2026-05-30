@@ -666,26 +666,38 @@ function CollaborateurDetails() {
                     <div className="space-y-4">
                       <div>
                         <label className="text-xs text-muted-foreground">Coût du kWh (€ TTC)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          max="5"
-                          inputMode="decimal"
-                          className={`mt-1 ${inputCls} max-w-[140px]`}
-                          value={policyDraftPrix}
-                          onChange={e => {
-                            const raw = e.target.value.replace(",", ".");
-                            if (raw === "") { setPolicyDraftPrix(""); return; }
-                            if (!/^\d*(\.\d{0,2})?$/.test(raw)) return;
-                            setPolicyDraftPrix(raw);
-                          }}
-                          onBlur={() => {
-                            const f = parseFloat(policyDraftPrix);
-                            if (!isFinite(f) || f <= 0) setPolicyDraftPrix("0.21");
-                            else setPolicyDraftPrix(f.toFixed(2));
-                          }}
-                        />
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0.21"
+                              className={`mt-1 ${inputCls} max-w-[140px]`}
+                              value={policyDraftPrix}
+                              onChange={e => {
+                                const raw = e.target.value.replace(",", ".");
+                                if (raw === "" || raw === ".") { setPolicyDraftPrix(raw); return; }
+                                if (!/^\d*(\.\d{0,2})?$/.test(raw)) return;
+                                setPolicyDraftPrix(raw);
+                              }}
+                              onBlur={() => {
+                                const f = parseFloat(policyDraftPrix);
+                                if (!isFinite(f) || f <= 0) {
+                                  toast.error("Coût kWh invalide", { description: "Le coût du kWh doit être un nombre décimal strictement positif (ex : 0.18)." });
+                                  setPolicyDraftPrix("0.21");
+                                  return;
+                                }
+                                if (f > 5) {
+                                  toast.error("Coût kWh trop élevé", { description: "Le coût du kWh doit être inférieur ou égal à 5 €/kWh." });
+                                  setPolicyDraftPrix("5.00");
+                                  return;
+                                }
+                                setPolicyDraftPrix(f.toFixed(2));
+                              }}
+                            />
+                            <span className="text-xs text-muted-foreground">€/kWh · positif · ≤ 5 · 2 décimales max</span>
+                          </div>
+                        </div>
                       </div>
                       <div>
                         <label className="text-xs text-muted-foreground">Jours éligibles au remboursement</label>
