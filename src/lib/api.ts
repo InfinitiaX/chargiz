@@ -128,6 +128,12 @@ export const api = {
     /** Hard delete avec cascade — superadmin uniquement. */
     delete: (id: string) =>
       apiFetch<any>(`/api/entreprises/${id}`, { method: "DELETE" }),
+    /** Active / désactive l'API publique pour une entreprise (superadmin). */
+    toggleApiPublique: (id: string) =>
+      apiFetch<{ entreprise_id: string; api_publique_enabled: boolean; message: string }>(
+        `/api/entreprises/${id}/api-publique`,
+        { method: "PATCH" }
+      ),
   },
   users: {
     list: (params?: Record<string, string>) => {

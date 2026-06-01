@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/api";
 import logoChargiz from "@/assets/logo-chargiz.png";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -57,6 +58,19 @@ export default function DashboardSidebar() {
     location.pathname.includes("/dashboard/entreprises")
   );
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [apiPubliqueEnabled, setApiPubliqueEnabled] = useState(false);
+
+  // Pour gestionnaire_entreprise : vérifie si l'API publique est activée
+  useEffect(() => {
+    if (role === "gestionnaire_entreprise" && profile?.entreprise_id) {
+      api.entreprises
+        .get(profile.entreprise_id)
+        .then((ent: any) => setApiPubliqueEnabled(!!ent.api_publique_enabled))
+        .catch(() => setApiPubliqueEnabled(false));
+    } else if (role === "superadmin" || role === "admin") {
+      setApiPubliqueEnabled(true);
+    }
+  }, [role, profile?.entreprise_id]);
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -258,13 +272,13 @@ export default function DashboardSidebar() {
             </Link>
           )}
 
-          {(role === "superadmin" || role === "admin" || role === "gestionnaire_entreprise") && (
+          {apiPubliqueEnabled && (
             <Link
               to="/dashboard/api-keys"
               className={`${linkBase} ${location.pathname.startsWith("/dashboard/api-keys") ? linkActive : linkIdle}`}
             >
               <KeyRound className="sidebar-icon h-5 w-5" />
-              Clés API
+              API & Webhooks
             </Link>
           )}
 
