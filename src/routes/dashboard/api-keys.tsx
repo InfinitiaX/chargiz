@@ -32,6 +32,11 @@ import {
   ToggleRight,
   ExternalLink,
   History,
+  BookOpen,
+  Terminal,
+  ChevronDown,
+  ChevronRight,
+  Power,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -51,19 +56,65 @@ export const Route = createFileRoute("/dashboard/api-keys")({
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const ALL_SCOPES = [
-  { value: "sessions:read", label: "Sessions" },
-  { value: "vehicles:read", label: "Véhicules" },
-  { value: "collaborators:read", label: "Collaborateurs" },
-  { value: "statistics:read", label: "Statistiques" },
-  { value: "reports:read", label: "Rapports" },
+  {
+    value: "sessions:read",
+    label: "Sessions",
+    description: "Lister les sessions de recharge (énergie, coût, domicile/hors-domicile, SOC)",
+    endpoint: "GET /api/v1/external/sessions",
+  },
+  {
+    value: "vehicles:read",
+    label: "Véhicules",
+    description: "Lister les véhicules de la flotte avec leurs statuts de connexion et d'affectation",
+    endpoint: "GET /api/v1/external/vehicules",
+  },
+  {
+    value: "collaborators:read",
+    label: "Collaborateurs",
+    description: "Lister les collaborateurs actifs (nom, prénom, matricule — sans données sensibles)",
+    endpoint: "GET /api/v1/external/collaborateurs",
+  },
+  {
+    value: "statistics:read",
+    label: "Statistiques",
+    description: "Statistiques agrégées de l'entreprise : énergie, coût total remboursable, conso moyenne",
+    endpoint: "GET /api/v1/external/statistics",
+  },
+  {
+    value: "fleet:read",
+    label: "Table flotte",
+    description: "Tableau détaillé par conducteur : kWh domicile/hors-domicile, coût, conso, CO₂ évité",
+    endpoint: "GET /api/v1/external/fleet",
+  },
+  {
+    value: "policy:read",
+    label: "Politique recharge",
+    description: "Politique de recharge de l'entreprise : tarif kWh, jours éligibles, délégation",
+    endpoint: "GET /api/v1/external/policy",
+  },
+  {
+    value: "co2:read",
+    label: "Bilan CO₂",
+    description: "CO₂ évité par collaborateur — utile pour les rapports RSE et bilans carbone",
+    endpoint: "GET /api/v1/external/co2",
+  },
+  {
+    value: "reports:read",
+    label: "Rapports",
+    description: "Accès aux exports et récapitulatifs PDF de sessions",
+    endpoint: "GET /api/v1/external/reports",
+  },
 ] as const;
 
 const SCOPE_COLORS: Record<string, string> = {
-  "sessions:read": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  "vehicles:read": "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-  "collaborators:read": "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
-  "statistics:read": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  "reports:read": "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+  "sessions:read":     "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  "vehicles:read":     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  "collaborators:read":"bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
+  "statistics:read":   "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  "fleet:read":        "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300",
+  "policy:read":       "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  "co2:read":          "bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300",
+  "reports:read":      "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -107,6 +158,10 @@ function shortEndpoint(ep: string): string {
     collaborateurs: "Collaborateurs",
     vehicules: "Véhicules",
     statistics: "Statistiques",
+    fleet: "Table flotte",
+    policy: "Politique",
+    co2: "Bilan CO₂",
+    reports: "Rapports",
     health: "Health check",
   };
   return labels[last] ?? last;
@@ -404,14 +459,18 @@ function ConfirmDialog({
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
-type Tab = "keys" | "stats" | "webhooks";
+type Tab = "keys" | "stats" | "webhooks" | "tutorial";
 
 function ApiKeysPage() {
   const { role, profile } = useAuth();
   const isSuperOrAdmin = role === "superadmin" || role === "admin";
+  const isSuperadmin = role === "superadmin";
   const isGest = role === "gestionnaire_entreprise";
 
   const [tab, setTab] = useState<Tab>("keys");
+  // Toggle API publique (superadmin)
+  const [togglingApi, setTogglingApi] = useState(false);
+  const [entrepriseApiStatus, setEntrepriseApiStatus] = useState<Record<string, boolean>>({});
 
   // Entreprise
   const [selectedEid, setSelectedEid] = useState<string>(profile?.entreprise_id ?? "");
@@ -448,10 +507,29 @@ function ApiKeysPage() {
     setEntLoading(true);
     api.entreprises
       .list()
-      .then((list) => { setEntreprises(list); if (list.length === 1) setSelectedEid(list[0].id); })
+      .then((list) => {
+        setEntreprises(list);
+        if (list.length === 1) setSelectedEid(list[0].id);
+        const statusMap: Record<string, boolean> = {};
+        for (const e of list) statusMap[e.id] = !!e.api_publique_enabled;
+        setEntrepriseApiStatus(statusMap);
+      })
       .catch(console.error)
       .finally(() => setEntLoading(false));
   }, [isSuperOrAdmin]);
+
+  const handleToggleApiPublique = async (eid: string) => {
+    setTogglingApi(true);
+    try {
+      const res = await api.entreprises.toggleApiPublique(eid);
+      setEntrepriseApiStatus((prev) => ({ ...prev, [eid]: res.api_publique_enabled }));
+      toast.success(res.message);
+    } catch (err: any) {
+      toast.error("Erreur", { description: err.message });
+    } finally {
+      setTogglingApi(false);
+    }
+  };
 
   const effectiveEid = isGest ? (profile?.entreprise_id ?? "") : selectedEid;
   const usageParams = isSuperOrAdmin && effectiveEid ? { entreprise_id: effectiveEid } : undefined;
@@ -585,23 +663,44 @@ function ApiKeysPage() {
               <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
             </div>
           ) : (
-            <select
-              value={selectedEid}
-              onChange={(e) => setSelectedEid(e.target.value)}
-              className={`mt-1.5 w-full max-w-sm ${inputCls}`}
-            >
-              <option value="">— Sélectionner une entreprise —</option>
-              {entreprises.map((e) => (
-                <option key={e.id} value={e.id}>{e.nom}</option>
-              ))}
-            </select>
+            <div className="mt-1.5 flex flex-wrap items-center gap-3">
+              <select
+                value={selectedEid}
+                onChange={(e) => setSelectedEid(e.target.value)}
+                className={`w-full max-w-sm ${inputCls}`}
+              >
+                <option value="">— Sélectionner une entreprise —</option>
+                {entreprises.map((e) => (
+                  <option key={e.id} value={e.id}>{e.nom}</option>
+                ))}
+              </select>
+              {isSuperadmin && selectedEid && (
+                <button
+                  onClick={() => handleToggleApiPublique(selectedEid)}
+                  disabled={togglingApi}
+                  title={entrepriseApiStatus[selectedEid] ? "Désactiver l'API publique" : "Activer l'API publique"}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 ${
+                    entrepriseApiStatus[selectedEid]
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400"
+                      : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                  }`}
+                >
+                  {togglingApi ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Power className="h-3.5 w-3.5" />
+                  )}
+                  API publique : {entrepriseApiStatus[selectedEid] ? "Activée" : "Désactivée"}
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
 
       {/* Onglets */}
       {effectiveEid && (
-        <div className="mb-6 inline-flex rounded-xl bg-muted p-1">
+        <div className="mb-6 inline-flex flex-wrap rounded-xl bg-muted p-1 gap-0.5">
           <TabBtn active={tab === "keys"} onClick={() => setTab("keys")} icon={<KeyRound className="h-4 w-4" />}>
             Clés API
           </TabBtn>
@@ -610,6 +709,9 @@ function ApiKeysPage() {
           </TabBtn>
           <TabBtn active={tab === "webhooks"} onClick={() => setTab("webhooks")} icon={<Webhook className="h-4 w-4" />}>
             Webhooks
+          </TabBtn>
+          <TabBtn active={tab === "tutorial"} onClick={() => setTab("tutorial")} icon={<BookOpen className="h-4 w-4" />}>
+            Tutoriel
           </TabBtn>
         </div>
       )}
@@ -641,7 +743,7 @@ function ApiKeysPage() {
                   </p>
                   <p className="text-muted-foreground text-xs">
                     Endpoints :{" "}
-                    <code className="font-mono">/health · /sessions · /collaborateurs · /vehicules · /statistics</code>
+                    <code className="font-mono">/health · /sessions · /collaborateurs · /vehicules · /statistics · /fleet · /policy · /co2</code>
                   </p>
                   <p className="text-muted-foreground text-xs">
                     Limite : <strong>1 000 requêtes/heure</strong> par clé.
@@ -663,6 +765,13 @@ function ApiKeysPage() {
           ) : stats ? (
             <StatsTab stats={stats} onRefresh={loadStats} />
           ) : null}
+        </>
+      )}
+
+      {/* ── Onglet Tutoriel ──────────────────────────────────────────────────── */}
+      {tab === "tutorial" && (
+        <>
+          {!effectiveEid ? <EmptyEnterprise /> : <TutorialTab />}
         </>
       )}
 
@@ -1147,6 +1256,236 @@ function HealthCard({
         {value}
       </p>
       <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>
+    </div>
+  );
+}
+
+// ─── Onglet Tutoriel ──────────────────────────────────────────────────────────
+
+type TutorialStep = {
+  id: string;
+  title: string;
+  description: string;
+  code?: string;
+  note?: string;
+};
+
+const TUTORIAL_STEPS: TutorialStep[] = [
+  {
+    id: "step1",
+    title: "1. Créer une clé API",
+    description:
+      "Rendez-vous dans l'onglet « Clés API » → cliquez « Nouvelle clé ». Donnez-lui un nom descriptif (ex : « Intégration Geotab »), sélectionnez les scopes nécessaires, puis confirmez. La clé brute s'affiche une seule fois — copiez-la immédiatement.",
+    note: "La clé commence toujours par czk_live_. Ne la partagez pas dans du code source versionné.",
+  },
+  {
+    id: "step2",
+    title: "2. Vérifier que l'API répond",
+    description:
+      "Testez le health check (aucune authentification requise) pour confirmer que le serveur est joignable.",
+    code: `curl https://api.chargiz.com/api/v1/external/health
+# Réponse attendue :
+# { "status": "ok", "version": "1.0.0" }`,
+  },
+  {
+    id: "step3",
+    title: "3. Premier appel authentifié — Sessions",
+    description:
+      "Placez votre clé dans le header X-API-Key. Toutes les réponses sont paginées (page + per_page).",
+    code: `curl https://api.chargiz.com/api/v1/external/sessions \\
+  -H "X-API-Key: czk_live_VOTRE_CLE" \\
+  -G \\
+  --data-urlencode "entreprise_id=VOTRE_ENTREPRISE_ID" \\
+  --data-urlencode "page=1" \\
+  --data-urlencode "per_page=50"`,
+    note: "Le scope sessions:read est requis sur la clé.",
+  },
+  {
+    id: "step4",
+    title: "4. Filtrer par date",
+    description: "Tous les endpoints de liste acceptent date_from et date_to au format ISO 8601.",
+    code: `curl "https://api.chargiz.com/api/v1/external/sessions?entreprise_id=…&date_from=2026-01-01T00:00:00Z&date_to=2026-06-30T23:59:59Z" \\
+  -H "X-API-Key: czk_live_VOTRE_CLE"`,
+  },
+  {
+    id: "step5",
+    title: "5. Table flotte — vue par conducteur",
+    description:
+      "L'endpoint /fleet retourne un tableau synthétique par conducteur avec énergie, coût, conso et CO₂. Idéal pour alimenter un FMS ou un tableau de bord RH.",
+    code: `curl "https://api.chargiz.com/api/v1/external/fleet?entreprise_id=…" \\
+  -H "X-API-Key: czk_live_VOTRE_CLE"
+# Scope requis : fleet:read`,
+  },
+  {
+    id: "step6",
+    title: "6. Configurer un Webhook",
+    description:
+      "Dans l'onglet « Webhooks », créez un abonnement avec votre URL de destination. ChargiZ enverra un POST signé dès qu'une session se termine — plus besoin de polling.",
+    code: `# Votre serveur reçoit :
+POST https://votre-fms.com/chargiz-hook
+X-ChargiZ-Signature: sha256=abc123…
+X-ChargiZ-Event: session.completed
+Content-Type: application/json
+
+{
+  "event": "session.completed",
+  "data": { "energie_kwh": 25.5, "cout_euro": 6.38, … }
+}`,
+  },
+  {
+    id: "step7",
+    title: "7. Vérifier la signature webhook",
+    description:
+      "Côté serveur récepteur, recalculez le HMAC-SHA256 du body avec votre secret et comparez au header X-ChargiZ-Signature. Rejetez silencieusement si les signatures ne correspondent pas.",
+    code: `// Node.js
+import crypto from "crypto";
+
+function verifySignature(rawBody, secret, signatureHeader) {
+  const expected = "sha256=" + crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
+  return crypto.timingSafeEqual(
+    Buffer.from(expected),
+    Buffer.from(signatureHeader)
+  );
+}
+
+// Python
+import hmac, hashlib
+def verify(raw_body: bytes, secret: str, sig_header: str) -> bool:
+    expected = "sha256=" + hmac.new(
+        secret.encode(), raw_body, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, sig_header)`,
+    note: "Utilisez toujours une comparaison en temps constant (timingSafeEqual / compare_digest) pour éviter les attaques par timing.",
+  },
+  {
+    id: "step8",
+    title: "8. Gérer les erreurs",
+    description: "L'API retourne des codes HTTP standards. Voici les principaux cas à gérer dans votre intégration.",
+    code: `401 MISSING_API_KEY     → Header X-API-Key absent
+401 KEY_INVALID         → Clé inconnue, expirée ou révoquée
+403 API_ACCESS_DISABLED → API publique non activée pour cette entreprise
+403 INSUFFICIENT_SCOPE  → La clé n'a pas le scope requis
+429 RATE_LIMIT_EXCEEDED → Limite horaire dépassée (1 000 req/h par clé)
+422                     → Paramètre de requête invalide`,
+    note: "En cas de 429, attendez le début de l'heure suivante. Le header X-RateLimit-Reset indique le timestamp de reset.",
+  },
+];
+
+function CodeBlock({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="relative mt-3 rounded-lg border border-border bg-muted/60">
+      <button
+        onClick={copy}
+        className="absolute right-2 top-2 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        title="Copier"
+      >
+        {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+      <pre className="overflow-x-auto p-4 pr-10 text-[11px] leading-relaxed text-foreground font-mono">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function TutorialTab() {
+  const [expanded, setExpanded] = useState<string>("step1");
+
+  return (
+    <div className="space-y-4">
+      {/* Intro */}
+      <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-start gap-3">
+          <BookOpen className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+          <div>
+            <p className="font-semibold text-card-foreground">Guide d'intégration ChargiZ API</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Suivez ces 8 étapes pour connecter votre système externe (FMS, outil RH, SI interne)
+              à l'API publique ChargiZ. Chaque étape contient un exemple prêt à l'emploi.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Référence rapide des scopes */}
+      <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <p className="mb-3 text-sm font-semibold text-card-foreground flex items-center gap-2">
+          <Terminal className="h-4 w-4 text-primary" /> Référence des scopes & endpoints
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="pb-2 text-left font-semibold text-muted-foreground">Scope</th>
+                <th className="pb-2 text-left font-semibold text-muted-foreground">Endpoint</th>
+                <th className="pb-2 text-left font-semibold text-muted-foreground">Description</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {ALL_SCOPES.map((s) => (
+                <tr key={s.value} className="hover:bg-muted/20">
+                  <td className="py-2 pr-4">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${SCOPE_COLORS[s.value] ?? "bg-muted text-muted-foreground"}`}>
+                      {s.label}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-4 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                    {s.endpoint}
+                  </td>
+                  <td className="py-2 text-muted-foreground">{s.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Étapes accordéon */}
+      <div className="space-y-2">
+        {TUTORIAL_STEPS.map((step) => {
+          const open = expanded === step.id;
+          return (
+            <div
+              key={step.id}
+              className={`rounded-xl border bg-card shadow-sm transition-colors ${open ? "border-primary/30" : "border-border"}`}
+            >
+              <button
+                onClick={() => setExpanded(open ? "" : step.id)}
+                className="flex w-full items-center justify-between px-5 py-4 text-left"
+              >
+                <span className={`text-sm font-semibold ${open ? "text-primary" : "text-card-foreground"}`}>
+                  {step.title}
+                </span>
+                {open
+                  ? <ChevronDown className="h-4 w-4 text-primary shrink-0" />
+                  : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                }
+              </button>
+              {open && (
+                <div className="border-t border-border px-5 pb-5 pt-4">
+                  <p className="text-sm text-muted-foreground">{step.description}</p>
+                  {step.code && <CodeBlock code={step.code} />}
+                  {step.note && (
+                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>{step.note}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
