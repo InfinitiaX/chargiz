@@ -18,6 +18,7 @@ import {
   Zap,
   User,
   Menu,
+  KeyRound,
 } from "lucide-react";
 
 interface NavItem {
@@ -266,6 +267,16 @@ export default function DashboardSidebar() {
             >
               <ShieldCheck className="sidebar-icon h-5 w-5" />
               Administration
+            </Link>
+          )}
+
+          {(role === "superadmin" || role === "admin" || role === "gestionnaire_entreprise") && (
+            <Link
+              to="/dashboard/api-keys"
+              className={`${linkBase} ${location.pathname.startsWith("/dashboard/api-keys") ? linkActive : linkIdle}`}
+            >
+              <KeyRound className="sidebar-icon h-5 w-5" />
+              API &amp; Webhooks
             </Link>
           )}
 
