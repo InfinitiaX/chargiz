@@ -1,18 +1,14 @@
 import { useState, useEffect } from "react";
-import { X, Car, ShieldCheck } from "lucide-react";
+import { X, Car, ShieldCheck, AlertCircle } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import VehiculeSelector, { type VehiculeSelectorValue } from "@/components/VehiculeSelector";
+import { normalizeImmat, getImmatError } from "@/lib/immat";
 
 interface Props {
   entrepriseId: string;
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
-}
-
-// Normalise l'immatriculation (CDC §5.1.1.2 — majuscules, lettres/chiffres uniquement)
-function normalizeImmat(raw: string): string {
-  return raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
 export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCreated }: Props) {
@@ -37,9 +33,13 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
 
   if (!open) return null;
 
+  const immatErr = form.immatriculation ? getImmatError(form.immatriculation) : null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vehSelector.marque.trim() || !vehSelector.modele.trim()) return;
+    // Si une immatriculation est saisie, elle doit être valide
+    if (form.immatriculation && immatErr) return;
     setLoading(true);
     try {
       await apiFetch("/api/vehicules", {
@@ -89,13 +89,17 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
             <div>
               <label className="text-sm font-medium text-foreground">Immatriculation</label>
               <input
-                className={`${inputCls} font-mono uppercase tracking-wide`}
+                className={`${inputCls} font-mono uppercase tracking-wide ${immatErr ? "border-destructive" : ""}`}
                 value={form.immatriculation}
                 onChange={e => setForm(f => ({ ...f, immatriculation: normalizeImmat(e.target.value) }))}
-                placeholder="AB123CD"
-                maxLength={10}
+                placeholder="AB-123-CD"
+                maxLength={9}
               />
-              <p className="mt-1 text-[11px] text-muted-foreground">Lettres/chiffres — auto-formaté</p>
+              {immatErr ? (
+                <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-destructive">
+                  <AlertCircle className="h-3 w-3" /> {immatErr}
+                </p>
+              ) : null}
             </div>
             <div>
               <label className="text-sm font-medium text-foreground">VIN</label>
@@ -122,7 +126,7 @@ export default function CreateVehiculeDialog({ entrepriseId, open, onClose, onCr
             </button>
             <button
               type="submit"
-              disabled={loading || !vehSelector.marque.trim() || !vehSelector.modele.trim()}
+              disabled={loading || !vehSelector.marque.trim() || !vehSelector.modele.trim() || !!(form.immatriculation && immatErr)}
               className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50"
             >
               {loading ? "Création..." : "Ajouter au parc"}

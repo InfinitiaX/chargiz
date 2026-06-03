@@ -184,7 +184,7 @@ function AuditLogPage() {
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="cz-table-head">
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Utilisateur</th>

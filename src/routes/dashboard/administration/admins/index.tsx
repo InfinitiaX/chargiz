@@ -1,10 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import {
   ArrowLeft, ShieldAlert, ShieldCheck, UserPlus, Building2, Trash2,
-  Archive, ArchiveRestore, Search, ArrowLeftRight, AlertCircle,
+  Archive, ArchiveRestore, Search, ArrowLeftRight, AlertCircle, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import PageSkeleton from "@/components/PageSkeleton";
@@ -16,7 +16,7 @@ import CreateAdminDialog from "@/components/CreateAdminDialog";
 import AdminAssignDialog from "@/components/AdminAssignDialog";
 import AdminMutationDialog from "@/components/AdminMutationDialog";
 
-export const Route = createFileRoute("/dashboard/administration/admins")({
+export const Route = createFileRoute("/dashboard/administration/admins/")({
   component: AdminsPage,
   head: () => ({ meta: [{ title: "ChargiZ — Admins" }] }),
 });
@@ -34,6 +34,7 @@ interface AdminItem {
 function AdminsPage() {
   const { role } = useAuth();
   const isSuperadmin = role === "superadmin";
+  const navigate = useNavigate();
 
   const [admins, setAdmins] = useState<AdminItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +63,9 @@ function AdminsPage() {
       setLoading(false);
     }
   }
+
+  const goToDetail = (id: number) =>
+    navigate({ to: "/dashboard/administration/admins/$id", params: { id: String(id) } });
 
   async function toggleActive(admin: AdminItem) {
     setProcessingId(admin.id);
@@ -157,7 +161,7 @@ function AdminsPage() {
             placeholder="Rechercher par nom ou email..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm shadow-sm outline-none transition-all hover:border-[#0f4b49]/40 focus:border-[#0f4b49] focus:ring-2 focus:ring-[#0f4b49]/20"
           />
         </div>
       </div>
@@ -165,7 +169,7 @@ function AdminsPage() {
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="cz-table-head">
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Admin</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Email</th>
@@ -192,17 +196,18 @@ function AdminsPage() {
                   </td>
                 </tr>
               ) : filtered.map(a => (
-                <tr key={a.id} className="hover:bg-muted/30 transition-colors">
+                <tr
+                  key={a.id}
+                  onClick={() => goToDetail(a.id)}
+                  className="cursor-pointer hover:bg-[#0f4b49]/[0.05] transition-colors"
+                >
                   <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-medium text-card-foreground">{a.full_name || "—"}</span>
-                      <span className="text-xs text-muted-foreground">@{a.username}</span>
-                    </div>
+                    <span className="font-medium text-card-foreground">{a.full_name || "—"}</span>
                   </td>
                   <td className="px-6 py-4 text-card-foreground">{a.email}</td>
                   <td className="px-6 py-4 text-right">
                     <button
-                      onClick={() => setAssigning(a)}
+                      onClick={(e) => { e.stopPropagation(); setAssigning(a); }}
                       className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/15"
                     >
                       <Building2 className="h-3 w-3" />
@@ -222,7 +227,7 @@ function AdminsPage() {
                     <div className="flex items-center justify-end gap-2">
                       <IconTooltip label="Gérer les entreprises">
                         <button
-                          onClick={() => setAssigning(a)}
+                          onClick={(e) => { e.stopPropagation(); setAssigning(a); }}
                           className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                         >
                           <Building2 className="h-4 w-4" />
@@ -231,7 +236,7 @@ function AdminsPage() {
                       {a.is_active ? (
                         <IconTooltip label="Désactiver">
                           <button
-                            onClick={() => toggleActive(a)}
+                            onClick={(e) => { e.stopPropagation(); toggleActive(a); }}
                             disabled={processingId === a.id}
                             className="rounded-md p-1.5 text-muted-foreground hover:bg-amber-500/10 hover:text-amber-600 transition-colors disabled:opacity-40"
                           >
@@ -241,7 +246,7 @@ function AdminsPage() {
                       ) : (
                         <IconTooltip label="Réactiver">
                           <button
-                            onClick={() => toggleActive(a)}
+                            onClick={(e) => { e.stopPropagation(); toggleActive(a); }}
                             disabled={processingId === a.id}
                             className="rounded-md p-1.5 text-muted-foreground hover:bg-chargiz-teal/10 hover:text-chargiz-teal transition-colors disabled:opacity-40"
                           >
@@ -251,12 +256,13 @@ function AdminsPage() {
                       )}
                       <IconTooltip label="Supprimer définitivement">
                         <button
-                          onClick={() => setDeleteTarget(a)}
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(a); }}
                           className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </IconTooltip>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                     </div>
                   </td>
                 </tr>

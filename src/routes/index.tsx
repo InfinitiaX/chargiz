@@ -182,7 +182,7 @@ function LoginPage() {
                 <input id="email" type="email" required placeholder="nom@entreprise.fr" value={email} onChange={e => setEmail(e.target.value)}
                   className="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20" />
               </div>
-              <button type="submit" disabled={loading} className="w-full rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground transition-all hover:brightness-95 active:scale-[0.98] disabled:opacity-50">
+              <button type="submit" disabled={loading} className="w-full rounded-xl bg-[#0f4b49] py-3 text-sm font-semibold text-white transition-all hover:bg-[#0d3f3d] active:scale-[0.98] disabled:opacity-50">
                 {loading ? "Envoi..." : "Envoyer le lien"}
               </button>
               <button type="button" onClick={() => setForgotMode(false)} className="w-full text-sm text-muted-foreground hover:text-foreground">Retour à la connexion</button>
@@ -213,7 +213,7 @@ function LoginPage() {
                   Mot de passe oublié ?
                 </button>
               </div>
-              <button type="submit" disabled={loading} className="w-full rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground transition-all hover:brightness-95 active:scale-[0.98] disabled:opacity-50">
+              <button type="submit" disabled={loading} className="w-full rounded-xl bg-[#0f4b49] py-3 text-sm font-semibold text-white transition-all hover:bg-[#0d3f3d] active:scale-[0.98] disabled:opacity-50">
                 {loading ? "Connexion..." : "Se connecter"}
               </button>
             </form>

@@ -46,7 +46,7 @@ function ListeEntreprises() {
   const [deleting, setDeleting] = useState(false);
   const [page, setPage] = useState(1);
 
-  const canAccess = role === "superadmin" || role === "gestionnaire_entreprise";
+  const canAccess = role === "superadmin" || role === "admin" || role === "gestionnaire_entreprise";
   const canManage = role === "superadmin"; // créer, modifier, archiver, supprimer définitivement
 
   useEffect(() => {
@@ -164,8 +164,15 @@ function ListeEntreprises() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Entreprises</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {activeCount} active{activeCount > 1 ? "s" : ""}
-            {archivedCount > 0 && <span className="text-muted-foreground/60"> · {archivedCount} archivée{archivedCount > 1 ? "s" : ""}</span>}
+            {filterStatut === "archived" ? (
+              <>{archivedCount} archivée{archivedCount > 1 ? "s" : ""}
+                {activeCount > 0 && <span className="text-muted-foreground/60"> · {activeCount} active{activeCount > 1 ? "s" : ""}</span>}
+              </>
+            ) : (
+              <>{activeCount} active{activeCount > 1 ? "s" : ""}
+                {archivedCount > 0 && <span className="text-muted-foreground/60"> · {archivedCount} archivée{archivedCount > 1 ? "s" : ""}</span>}
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -187,7 +194,7 @@ function ListeEntreprises() {
           >
             <Download className="h-4 w-4" /> Export Excel
           </button>
-          {role === "superadmin" && (
+          {(role === "superadmin" || role === "admin") && (
             <button
               onClick={() => setShowAdd(true)}
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light"
@@ -227,7 +234,7 @@ function ListeEntreprises() {
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="cz-table-head">
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Entreprise</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">SIREN</th>
@@ -242,16 +249,39 @@ function ListeEntreprises() {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7}>
-                    <EmptyState
-                      icon={Building2}
-                      title={search ? "Aucun résultat" : "Aucune entreprise"}
-                      description={search ? "Essayez d'autres mots-clés ou réinitialisez la recherche." : "Créez votre première entreprise pour démarrer le suivi de votre flotte."}
-                      action={!search && role === "superadmin" ? (
-                        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
-                          <Plus className="h-4 w-4" /> Ajouter une entreprise
-                        </button>
-                      ) : undefined}
-                    />
+                    {(() => {
+                      // Titre / description / bouton adaptés au contexte
+                      let title: string;
+                      let description: string;
+                      let showCreateButton = false;
+                      if (search) {
+                        title = "Aucun résultat";
+                        description = "Essayez d'autres mots-clés ou réinitialisez la recherche.";
+                      } else if (filterStatut === "archived") {
+                        title = "Aucune entreprise archivée";
+                        description = "Aucune entreprise n'a été archivée pour le moment.";
+                      } else if (filterStatut === "active") {
+                        title = "Aucune entreprise active";
+                        description = "Toutes vos entreprises sont actuellement archivées. Créez-en une nouvelle ou désarchivez-en depuis l'onglet « Archivées ».";
+                        showCreateButton = role === "superadmin" || role === "admin";
+                      } else {
+                        title = "Aucune entreprise";
+                        description = "Créez votre première entreprise pour démarrer le suivi de votre flotte.";
+                        showCreateButton = role === "superadmin" || role === "admin";
+                      }
+                      return (
+                        <EmptyState
+                          icon={Building2}
+                          title={title}
+                          description={description}
+                          action={showCreateButton ? (
+                            <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light">
+                              <Plus className="h-4 w-4" /> Ajouter une entreprise
+                            </button>
+                          ) : undefined}
+                        />
+                      );
+                    })()}
                   </td>
                 </tr>
               ) : paginated.map(e => (

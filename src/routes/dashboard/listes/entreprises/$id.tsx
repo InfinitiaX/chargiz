@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   ArrowLeft, Building2, Users, Car, Zap, Euro, Battery,
   MapPin, Mail, Phone, Hash, Calendar, ShieldCheck, Check, ArrowRight,
+  Network, MapPinned,
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/listes/entreprises/$id")({
@@ -21,6 +22,8 @@ function EntrepriseDetail() {
   const [users, setUsers] = useState<any[]>([]);
   const [collabs, setCollabs] = useState<any[]>([]);
   const [vehicules, setVehicules] = useState<any[]>([]);
+  const [filiales, setFiliales] = useState<any[]>([]);
+  const [sites, setSites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -30,18 +33,22 @@ function EntrepriseDetail() {
     if (authLoading || !canAccess) return;
     (async () => {
       try {
-        const [ent, st, us, cs, vs] = await Promise.all([
+        const [ent, st, us, cs, vs, fs, ss] = await Promise.all([
           api.entreprises.get(id),
           api.stats.get(id).catch(() => null),
           api.users.list({ entreprise_id: id }).catch(() => []),
           api.collaborateurs.list({ entreprise_id: id }).catch(() => []),
           api.vehicules.list({ entreprise_id: id }).catch(() => []),
+          api.filiales.list({ entreprise_id: id }).catch(() => []),
+          api.sites.list({ entreprise_id: id }).catch(() => []),
         ]);
         setEntreprise(ent);
         setStats(st);
         setUsers(us);
         setCollabs(cs);
         setVehicules(vs);
+        setFiliales(fs);
+        setSites(ss);
       } catch (e: any) {
         setErr(e.message ?? "Erreur de chargement");
       } finally {
@@ -127,6 +134,96 @@ function EntrepriseDetail() {
         </div>
       </Section>
 
+      {/* Hiérarchie organisationnelle Entreprise → Filiale → Site */}
+      <Section title={`Hiérarchie (${filiales.length} filiale${filiales.length > 1 ? "s" : ""}, ${sites.length} site${sites.length > 1 ? "s" : ""})`} icon={Network}>
+        {filiales.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">
+            Cette entreprise n'a pas de filiale. Les collaborateurs sont rattachés directement à l'entreprise.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {filiales
+              .slice()
+              .sort((a, b) => a.nom.localeCompare(b.nom))
+              .map((f: any) => {
+                const sitesFiliale = sites.filter((s: any) => s.filiale_id === f.id);
+                const collabsFiliale = collabs.filter((c: any) => c.filiale_id === f.id);
+                return (
+                  <div key={f.id} className="rounded-lg border border-border bg-muted/20 p-3">
+                    {/* Filiale */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Building2 className="h-4 w-4 text-primary shrink-0" />
+                      <Link
+                        to="/dashboard/listes/filiales/$id"
+                        params={{ id: f.id }}
+                        className="font-semibold text-card-foreground hover:underline"
+                      >
+                        {f.nom}
+                      </Link>
+                      {!f.is_active && (
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          archivée
+                        </span>
+                      )}
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {sitesFiliale.length} site{sitesFiliale.length > 1 ? "s" : ""}
+                        {" · "}
+                        {collabsFiliale.length} collaborateur{collabsFiliale.length > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    {/* Sites de la filiale */}
+                    {sitesFiliale.length > 0 && (
+                      <ul className="mt-2 space-y-1 pl-6">
+                        {sitesFiliale
+                          .slice()
+                          .sort((a: any, b: any) => a.nom.localeCompare(b.nom))
+                          .map((s: any) => {
+                            const collabsSite = collabs.filter((c: any) => c.site_id === s.id);
+                            return (
+                              <li key={s.id}>
+                                <Link
+                                  to="/dashboard/listes/sites/$id"
+                                  params={{ id: s.id }}
+                                  className="flex flex-wrap items-center gap-2 rounded text-sm hover:underline"
+                                >
+                                  <MapPinned className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  <span className="text-card-foreground">{s.nom}</span>
+                                  {!s.is_active && (
+                                    <span className="rounded-full bg-muted px-1.5 py-0 text-[9px] uppercase tracking-wide text-muted-foreground">
+                                      archivé
+                                    </span>
+                                  )}
+                                  {s.ville && (
+                                    <span className="text-xs text-muted-foreground">· {s.ville}</span>
+                                  )}
+                                  <span className="ml-auto text-xs text-muted-foreground">
+                                    {collabsSite.length} collaborateur{collabsSite.length > 1 ? "s" : ""}
+                                  </span>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            {/* Collaborateurs non rattachés à une filiale */}
+            {(() => {
+              const collabsOrphelins = collabs.filter((c: any) => !c.filiale_id);
+              if (collabsOrphelins.length === 0) return null;
+              return (
+                <div className="rounded-lg border border-dashed border-border bg-muted/10 p-3 text-sm text-muted-foreground">
+                  <Users className="mr-1.5 inline h-3.5 w-3.5" />
+                  {collabsOrphelins.length} collaborateur{collabsOrphelins.length > 1 ? "s" : ""}
+                  {" "}rattaché{collabsOrphelins.length > 1 ? "s" : ""} directement à l'entreprise (sans filiale).
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </Section>
+
       {/* Gestionnaires de l'entreprise */}
       {(() => {
         const gestionnaires = users.filter((u: any) =>
@@ -141,7 +238,7 @@ function EntrepriseDetail() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="cz-table-head">
                     <tr className="border-b border-border bg-muted/30 text-left">
                       <th className="px-4 py-2 font-medium text-muted-foreground">Nom</th>
                       <th className="px-4 py-2 font-medium text-muted-foreground">Email</th>
@@ -177,7 +274,7 @@ function EntrepriseDetail() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="cz-table-head">
                 <tr className="border-b border-border bg-muted/30 text-left">
                   <th className="px-4 py-2 font-medium text-muted-foreground">Nom</th>
                   <th className="px-4 py-2 font-medium text-muted-foreground">Email</th>
@@ -213,7 +310,7 @@ function EntrepriseDetail() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="cz-table-head">
                 <tr className="border-b border-border bg-muted/30 text-left">
                   <th className="px-4 py-2 font-medium text-muted-foreground">Marque / Modèle</th>
                   <th className="px-4 py-2 font-medium text-muted-foreground">Immatriculation</th>

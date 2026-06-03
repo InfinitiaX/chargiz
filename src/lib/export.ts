@@ -79,158 +79,210 @@ interface JustificatifData {
   }[];
 }
 
-export function exportJustificatifPDF(data: JustificatifData) {
-  const totalKwh = data.sessions.reduce((a, s) => a + (s.energie_kwh || 0), 0);
-  const totalCout = data.sessions.reduce((a, s) => a + (s.cout_euro || 0), 0);
-  const totalKm = data.sessions.reduce((a, s) => a + (s.kilometrage || 0), 0);
-  const sessionsDomicile = data.sessions.filter(s => s.is_domicile);
-  const totalKwhDomicile = sessionsDomicile.reduce((a, s) => a + (s.energie_kwh || 0), 0);
-  const totalRemboursable = sessionsDomicile.reduce((a, s) => a + (s.cout_euro || 0), 0);
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString("fr-FR");
-  const now = new Date().toLocaleString("fr-FR");
+/**
+ * Génère et télécharge un justificatif PDF directement (sans ouvrir la fenêtre
+ * d'impression du navigateur). Utilise jsPDF + autotable, chargés dynamiquement.
+ * BugID — Le bouton "Justificatif PDF" sur Mes Consommations doit télécharger
+ * un fichier `.pdf` avec nom explicite `Recap_<nom>_<prenom>_<periode>.pdf`.
+ */
+export async function exportJustificatifPDF(data: JustificatifData) {
+  try {
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
 
-  const vehiculeStr = data.vehicule
-    ? [data.vehicule.marque, data.vehicule.modele].filter(Boolean).join(" ") + (data.vehicule.immatriculation ? ` — ${data.vehicule.immatriculation}` : "")
-    : "";
+    // ── Helpers format FR — ASCII-safe pour jsPDF (Latin-1 uniquement) ─────
+    // toLocaleString("fr-FR") insère U+202F (espace fine insécable) absent de
+    // la police helvetica de jsPDF → rendu cassé. On formate à la main.
+    const nf = (n: number, dec = 0): string => {
+      const v = Number.isFinite(n) ? n : 0;
+      const s = Math.abs(v).toFixed(dec);
+      const [intPart, fracPart] = s.split(".");
+      const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+      const sign = v < 0 ? "-" : "";
+      return fracPart ? `${sign}${grouped},${fracPart}` : `${sign}${grouped}`;
+    };
+    const fmt0 = (n: number) => nf(n, 0);
+    const fmt2 = (n: number) => nf(n, 2);
+    const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("fr-FR") : "-";
 
-  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8" />
-<title>Justificatif ChargiZ — ${data.collaborateur.prenom} ${data.collaborateur.nom}</title>
-<style>
-  @page { size: A4; margin: 15mm; }
-  * { box-sizing: border-box; }
-  body { font-family: 'Inter', Arial, sans-serif; color: #1a1a1a; font-size: 11px; line-height: 1.5; margin: 0; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px; border-bottom: 4px solid #225560; margin-bottom: 24px; }
-  .header h1 { color: #225560; margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
-  .header .sub { color: #666; font-size: 12px; margin: 0; }
-  .brand { text-align: right; }
-  .brand .logo { font-size: 28px; font-weight: 900; color: #225560; letter-spacing: -1px; line-height: 1; }
-  .brand .logo .accent { background: #DCF763; padding: 0 4px; border-radius: 3px; color: #225560; }
-  .brand .tagline { font-size: 9px; color: #666; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
-  .infos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-  .info-card { background: #f5f7f8; border-left: 3px solid #225560; padding: 12px 14px; border-radius: 0 6px 6px 0; }
-  .info-card h3 { margin: 0 0 6px; font-size: 10px; color: #225560; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
-  .info-card p { margin: 2px 0; font-size: 11px; }
-  .info-card strong { color: #225560; }
-  .totals-banner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 20px 0; }
-  .total-box { padding: 12px; border-radius: 8px; text-align: center; }
-  .total-box.primary { background: #225560; color: white; }
-  .total-box.accent { background: #DCF763; color: #225560; }
-  .total-box.secondary { background: #f5f7f8; color: #225560; border: 1px solid #e0e4e7; }
-  .total-box .label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.85; margin-bottom: 4px; }
-  .total-box .value { font-size: 20px; font-weight: 800; }
-  .total-box .unit { font-size: 11px; font-weight: 600; opacity: 0.9; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  th { background: #225560; color: white; padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
-  th.r, td.r { text-align: right; }
-  td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 10.5px; }
-  tr:nth-child(even) td { background: #fafbfc; }
-  .badge-dom { display: inline-block; background: #DCF763; color: #225560; font-size: 9px; padding: 2px 6px; border-radius: 10px; font-weight: 600; margin-left: 4px; }
-  .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9px; color: #666; line-height: 1.6; }
-  .footer .signature { margin-top: 20px; display: flex; justify-content: space-between; }
-  .footer .sig-block { width: 45%; }
-  .footer .sig-line { border-top: 1px solid #999; margin-top: 30px; padding-top: 4px; font-size: 9px; color: #666; text-align: center; }
-  @media print { .noprint { display: none; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style></head><body>
+    const totalKwh = data.sessions.reduce((a, s) => a + (s.energie_kwh || 0), 0);
+    const totalCout = data.sessions.reduce((a, s) => a + (s.cout_euro || 0), 0);
+    const totalKm = data.sessions.reduce((a, s) => a + (s.kilometrage || 0), 0);
+    const sessionsDomicile = data.sessions.filter(s => s.is_domicile);
+    const totalKwhDomicile = sessionsDomicile.reduce((a, s) => a + (s.energie_kwh || 0), 0);
+    const totalRemboursable = sessionsDomicile.reduce((a, s) => a + (s.cout_euro || 0), 0);
+    const now = new Date().toLocaleDateString("fr-FR");
 
-<div class="header">
-  <div>
-    <h1>Justificatif de recharge</h1>
-    <p class="sub">Période du <strong>${fmtDate(data.periode.from)}</strong> au <strong>${fmtDate(data.periode.to)}</strong></p>
-  </div>
-  <div class="brand">
-    <div class="logo">Chargi<span class="accent">Z</span></div>
-    <div class="tagline">Recharge VE professionnelle</div>
-  </div>
-</div>
+    const vehiculeStr = data.vehicule
+      ? [data.vehicule.marque, data.vehicule.modele].filter(Boolean).join(" ") + (data.vehicule.immatriculation ? ` - ${data.vehicule.immatriculation}` : "")
+      : "";
 
-<div class="infos-grid">
-  <div class="info-card">
-    <h3>Collaborateur</h3>
-    <p><strong>${data.collaborateur.prenom} ${data.collaborateur.nom}</strong></p>
-    <p>${data.collaborateur.email}</p>
-    ${data.entreprise?.nom ? `<p>Entreprise : <strong>${data.entreprise.nom}</strong></p>` : ""}
-  </div>
-  <div class="info-card">
-    <h3>Véhicule</h3>
-    ${vehiculeStr ? `<p><strong>${vehiculeStr}</strong></p>` : `<p style="color:#999;font-style:italic">Aucun véhicule affecté</p>`}
-    ${data.vehicule?.vin ? `<p style="font-family:monospace;font-size:9.5px">VIN : ${data.vehicule.vin}</p>` : ""}
-    <p style="color:#666;font-size:9.5px">Document généré le ${now}</p>
-  </div>
-</div>
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const periodeLabel = `${fmtDate(data.periode.from)} au ${fmtDate(data.periode.to)}`;
 
-<div class="totals-banner">
-  <div class="total-box primary">
-    <div class="label">Sessions</div>
-    <div class="value">${data.sessions.length}</div>
-  </div>
-  <div class="total-box secondary">
-    <div class="label">Énergie totale</div>
-    <div class="value">${totalKwh.toFixed(1)} <span class="unit">kWh</span></div>
-  </div>
-  <div class="total-box secondary">
-    <div class="label">kWh domicile</div>
-    <div class="value">${totalKwhDomicile.toFixed(1)} <span class="unit">kWh</span></div>
-  </div>
-  <div class="total-box accent">
-    <div class="label">Remboursable</div>
-    <div class="value">${totalRemboursable.toFixed(2)} <span class="unit">€</span></div>
-  </div>
-</div>
+    // Couleurs CDC §8.2
+    const BRAND_TEAL: [number, number, number] = [34, 85, 96];
+    const BRAND_DARK: [number, number, number] = [15, 23, 42];
+    const BRAND_MUTED: [number, number, number] = [107, 114, 128];
 
-<table>
-  <thead><tr>
-    <th>Date</th>
-    <th>Jour</th>
-    <th>Lieu</th>
-    <th class="r">Km</th>
-    <th class="r">Énergie</th>
-    <th class="r">Coût</th>
-  </tr></thead>
-  <tbody>
-    ${data.sessions.length === 0 ? `<tr><td colspan="6" style="text-align:center;padding:24px;color:#666;font-style:italic">Aucune session sur cette période</td></tr>` :
-      data.sessions.map(s => `<tr>
-        <td>${s.date_debut ? fmtDate(s.date_debut) : "—"}</td>
-        <td>${s.jour_semaine || "—"}</td>
-        <td>${s.is_domicile ? `Domicile<span class="badge-dom">DOM</span>` : "Bureau / Public"}</td>
-        <td class="r">${s.kilometrage != null ? s.kilometrage.toFixed(1) : "—"}</td>
-        <td class="r">${(s.energie_kwh || 0).toFixed(2)} kWh</td>
-        <td class="r">${(s.cout_euro || 0).toFixed(2)} €</td>
-      </tr>`).join("")}
-  </tbody>
-  <tfoot>
-    <tr style="background:#225560;color:white;font-weight:700">
-      <td colspan="3" style="padding:10px 12px">TOTAL GÉNÉRAL</td>
-      <td class="r" style="padding:10px 12px">${totalKm.toFixed(1)} km</td>
-      <td class="r" style="padding:10px 12px">${totalKwh.toFixed(2)} kWh</td>
-      <td class="r" style="padding:10px 12px">${totalCout.toFixed(2)} €</td>
-    </tr>
-  </tfoot>
-</table>
+    // ── Header bandeau ───────────────────────────────────────────────────
+    doc.setFillColor(...BRAND_TEAL);
+    doc.rect(0, 0, W, 26, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("ChargiZ", 14, 13);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("Justificatif de recharge", 14, 19);
+    doc.setFontSize(8);
+    doc.text(`Édité le ${now}`, W - 14, 13, { align: "right" });
 
-<div class="footer">
-  <p>Ce justificatif est généré automatiquement par la plateforme <strong>ChargiZ</strong> et atteste des sessions de recharge effectuées par le collaborateur sur le véhicule ci-dessus, durant la période indiquée. Les sessions des autres véhicules ou collaborateurs sont exclues. Document à valeur informative pour remboursement employeur.</p>
-  <div class="signature">
-    <div class="sig-block">
-      <div class="sig-line">Signature du collaborateur</div>
-    </div>
-    <div class="sig-block">
-      <div class="sig-line">Signature employeur / RH</div>
-    </div>
-  </div>
-</div>
+    // ── Bloc identité collab + véhicule ──────────────────────────────────
+    doc.setTextColor(...BRAND_DARK);
+    doc.setFontSize(15);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${data.collaborateur.prenom} ${data.collaborateur.nom}`, 14, 38);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...BRAND_MUTED);
+    doc.text(data.collaborateur.email, 14, 44);
+    if (data.entreprise?.nom) doc.text(`Entreprise : ${data.entreprise.nom}`, 14, 49);
+    doc.text(`Période : ${periodeLabel}`, 14, 54);
 
-<script>window.onload = () => { setTimeout(() => window.print(), 300); };<\/script>
-</body></html>`;
+    if (vehiculeStr) {
+      doc.setTextColor(...BRAND_DARK);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Véhicule", W - 14, 44, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...BRAND_MUTED);
+      doc.text(vehiculeStr, W - 14, 49, { align: "right" });
+      if (data.vehicule?.vin) doc.text(`VIN : ${data.vehicule.vin}`, W - 14, 54, { align: "right" });
+    }
 
-  const w = window.open("", "_blank", "width=900,height=700");
-  if (!w) {
-    toast.error("Fenêtre bloquée", {
-      description: "Autorisez les pop-ups pour ce site afin de générer le PDF.",
+    // ── Bandeau totaux (4 cartes uniformes) ──────────────────────────────
+    autoTable(doc, {
+      startY: 62,
+      head: [["Sessions", "Énergie totale", "kWh domicile", "Remboursable"]],
+      body: [[
+        fmt0(data.sessions.length),
+        `${fmt2(totalKwh)} kWh`,
+        `${fmt2(totalKwhDomicile)} kWh`,
+        `${fmt2(totalRemboursable)} €`,
+      ]],
+      theme: "grid",
+      headStyles: {
+        fillColor: BRAND_TEAL,
+        textColor: [255, 255, 255],
+        halign: "center",
+        fontStyle: "bold",
+        fontSize: 10,
+      },
+      bodyStyles: { halign: "center", fontStyle: "bold", fontSize: 12, textColor: BRAND_DARK },
+      styles: { cellPadding: 4, lineColor: [226, 232, 224] },
+      margin: { left: 14, right: 14 },
     });
-    return;
+
+    // ── Tableau sessions — colonnes strictement alignées ─────────────────
+    const finalY = (doc as any).lastAutoTable?.finalY ?? 110;
+
+    if (data.sessions.length === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 224);
+      doc.rect(14, finalY + 8, W - 28, 22, "FD");
+      doc.setTextColor(...BRAND_MUTED);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "italic");
+      doc.text(
+        "Aucune session de recharge sur la période sélectionnée.",
+        W / 2, finalY + 22, { align: "center" }
+      );
+    } else {
+      autoTable(doc, {
+        startY: finalY + 8,
+        head: [["Date", "Jour", "Lieu", "Km", "Énergie (kWh)", "Coût (€)"]],
+        body: data.sessions.map(s => [
+          fmtDate(s.date_debut),
+          s.jour_semaine || "-",
+          s.is_domicile ? "Domicile" : "Hors domicile",
+          s.kilometrage != null ? fmt0(s.kilometrage) : "-",
+          fmt2(s.energie_kwh || 0),
+          fmt2(s.cout_euro || 0),
+        ]),
+        foot: [[
+          { content: "TOTAL", colSpan: 3, styles: { halign: "left", fontStyle: "bold" } },
+          { content: fmt0(totalKm),  styles: { halign: "right", fontStyle: "bold" } },
+          { content: fmt2(totalKwh), styles: { halign: "right", fontStyle: "bold" } },
+          { content: fmt2(totalCout),styles: { halign: "right", fontStyle: "bold" } },
+        ]],
+        theme: "striped",
+        headStyles: {
+          fillColor: [50, 50, 80],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 10,
+        },
+        bodyStyles: { fontSize: 9, textColor: BRAND_DARK },
+        footStyles: {
+          fillColor: BRAND_TEAL,
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 10,
+        },
+        columnStyles: {
+          0: { halign: "left",  cellWidth: 26 },
+          1: { halign: "left",  cellWidth: 14 },
+          2: { halign: "left",  cellWidth: 32 },
+          3: { halign: "right", cellWidth: 22 },
+          4: { halign: "right", cellWidth: 36 },
+          5: { halign: "right", cellWidth: 26 },
+        },
+        didParseCell: (cellData) => {
+          // Force l'alignement de l'en-tête à correspondre à la colonne :
+          // les 3 dernières colonnes (numériques) doivent être right-aligned,
+          // les 3 premières left-aligned. Sans cette règle jsPDF centre par défaut.
+          if (cellData.section === "head") {
+            cellData.cell.styles.halign = cellData.column.index >= 3 ? "right" : "left";
+          }
+        },
+        styles: { cellPadding: { top: 2, right: 3, bottom: 2, left: 3 }, lineColor: [226, 232, 224] },
+        margin: { left: 14, right: 14 },
+      });
+    }
+
+    // ── Mention légale + footer pagination ───────────────────────────────
+    const finalY2 = (doc as any).lastAutoTable?.finalY ?? 200;
+    doc.setFontSize(8);
+    doc.setTextColor(...BRAND_MUTED);
+    doc.setFont("helvetica", "italic");
+    const footerText = "Ce justificatif est généré automatiquement par la plateforme ChargiZ et atteste des sessions de recharge effectuées par le collaborateur sur le véhicule ci-dessus, durant la période indiquée. Document à valeur informative pour remboursement employeur.";
+    const lines = doc.splitTextToSize(footerText, W - 28);
+    doc.text(lines, 14, finalY2 + 10);
+
+    const pageCount = (doc as any).internal.getNumberOfPages?.() ?? 1;
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7);
+      doc.setTextColor(...BRAND_MUTED);
+      doc.setFont("helvetica", "normal");
+      doc.text("ChargiZ - Justificatif de recharge", 14, H - 8);
+      doc.text(`Page ${i} / ${pageCount}`, W - 14, H - 8, { align: "right" });
+    }
+
+    // Nom de fichier explicite
+    const slug = (s: string) => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
+    const periodeSlug = `${data.periode.from}_${data.periode.to}`;
+    const fileName = `Recap_${slug(data.collaborateur.nom)}_${slug(data.collaborateur.prenom)}_${periodeSlug}.pdf`;
+    doc.save(fileName);
+    toast.success("Justificatif téléchargé", { description: fileName, duration: 3500 });
+  } catch (err: any) {
+    console.error("Justificatif PDF error:", err);
+    toast.error("Téléchargement impossible", { description: err.message || "Erreur lors de la génération du PDF." });
   }
-  w.document.write(html);
-  w.document.close();
 }
 
 function triggerDownload(blob: Blob, filename: string) {

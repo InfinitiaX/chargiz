@@ -3,6 +3,7 @@ import { X, AlertCircle, Users, Car, ChevronRight, Loader2 } from "lucide-react"
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import PhoneInput from "./PhoneInput";
+import AddressAutocomplete, { type AddressValue } from "./AddressAutocomplete";
 
 function friendlyError(raw: string): string {
   const m = raw.toLowerCase();
@@ -35,9 +36,13 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
     prenom: "",
     email: "",
     telephone: "",
-    adresse: "",
-    code_postal: "",
   });
+  // Adresse domicile avec autocomplétion + géocodage (sert à la détection des
+  // recharges à domicile — rayon 100 m, CDC §5.3).
+  const emptyAddress: AddressValue = {
+    pays_code: "FR", adresse: "", code_postal: "", ville: "", latitude: null, longitude: null,
+  };
+  const [address, setAddress] = useState<AddressValue>(emptyAddress);
 
   useEffect(() => {
     if (open) {
@@ -60,6 +65,11 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
     setLoading(true);
     setError(null);
     try {
+      // Compose l'adresse domicile complète (adresse + CP + ville) pour le
+      // champ home_address ; les coordonnées GPS alimentent la géolocalisation.
+      const homeAddress = [address.adresse, address.code_postal, address.ville]
+        .filter(Boolean).join(", ") || null;
+
       const profileData = await apiFetch<any>("/api/collaborateurs", {
         method: "POST",
         body: JSON.stringify({
@@ -67,8 +77,9 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
           prenom: form.prenom,
           email: form.email,
           telephone: form.telephone || null,
-          adresse: form.adresse || null,
-          code_postal: form.code_postal || null,
+          home_address: homeAddress,
+          home_latitude: address.latitude,
+          home_longitude: address.longitude,
           entreprise_id: entrepriseId,
           is_active: true,
         }),
@@ -86,7 +97,8 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
 
       onCreated();
       onClose();
-      setForm({ nom: "", prenom: "", email: "", telephone: "", adresse: "", code_postal: "" });
+      setForm({ nom: "", prenom: "", email: "", telephone: "" });
+      setAddress(emptyAddress);
 
       toast.success("Collaborateur ajouté avec succès", {
         description: `${form.prenom} ${form.nom} a été créé. Il recevra ses identifiants de connexion par email.`,
@@ -164,15 +176,14 @@ export default function CreateCollaborateurDialog({ entrepriseId, open, onClose,
                   defaultCountry="FR"
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Adresse <span className="text-muted-foreground text-xs ml-1 font-normal">(optionnel)</span></label>
-                  <input className={inputCls} value={form.adresse} onChange={e => setForm(f => ({ ...f, adresse: e.target.value }))} placeholder="Adresse complète" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Code postal <span className="text-muted-foreground text-xs ml-1 font-normal">(optionnel)</span></label>
-                  <input className={inputCls} value={form.code_postal} onChange={e => setForm(f => ({ ...f, code_postal: e.target.value }))} placeholder="75001" maxLength={5} inputMode="numeric" />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Adresse domicile <span className="text-muted-foreground text-xs ml-1 font-normal">(optionnel)</span>
+                </label>
+                <AddressAutocomplete value={address} onChange={setAddress} />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Sert à qualifier automatiquement les recharges effectuées à domicile (rayon de 100 m).
+                </p>
               </div>
             </div>
           </div>

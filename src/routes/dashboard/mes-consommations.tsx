@@ -124,7 +124,7 @@ function MesConsommationsPage() {
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="cz-table-head">
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Jour</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Date</th>

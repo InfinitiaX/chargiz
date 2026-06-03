@@ -12,6 +12,9 @@ import AssignVehicleDialog from "@/components/AssignVehicleDialog";
 import { exportCSV } from "@/lib/export";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
+import { normalizeImmat, getImmatError } from "@/lib/immat";
+import ImmatBadge from "@/components/ImmatBadge";
+import VehiculeSelector, { type VehiculeSelectorValue } from "@/components/VehiculeSelector";
 
 const PAGE_SIZE = 25;
 
@@ -176,6 +179,14 @@ function ListeVehicules() {
 
   const handleEditSave = async () => {
     if (!editVeh) return;
+    // CDC §5.1.1.2 — validation immatriculation
+    if (editVeh.immatriculation) {
+      const err = getImmatError(editVeh.immatriculation);
+      if (err) {
+        toast.error("Immatriculation invalide", { description: err, duration: 4000 });
+        return;
+      }
+    }
     setSavingEdit(true);
     try {
       await apiFetch(`/api/vehicules/${editVeh.id}`, {
@@ -280,7 +291,7 @@ function ListeVehicules() {
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="cz-table-head">
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Véhicule</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Immat</th>
@@ -319,7 +330,7 @@ function ListeVehicules() {
                       <span className="text-xs text-muted-foreground font-mono">{v.vin || "VIN non renseigné"}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-mono text-xs text-card-foreground">{v.immatriculation || "—"}</td>
+                  <td className="px-6 py-4 font-mono text-xs text-card-foreground"><ImmatBadge value={v.immatriculation} /></td>
                   {isSuperadmin && (
                     <td className="px-6 py-4">
                       {ent ? (
@@ -470,28 +481,40 @@ function ListeVehicules() {
               <button onClick={() => setEditVeh(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><label className="text-sm font-medium text-foreground">Marque</label><input className={inputCls} value={editVeh.marque || ""} onChange={e => setEditVeh({ ...editVeh, marque: e.target.value })} /></div>
-                <div><label className="text-sm font-medium text-foreground">Modèle</label><input className={inputCls} value={editVeh.modele || ""} onChange={e => setEditVeh({ ...editVeh, modele: e.target.value })} /></div>
-              </div>
+              {/* Sélecteur véhicule depuis base EV (marque/modèle/capacité auto) */}
+              <VehiculeSelector
+                value={{
+                  marque: editVeh.marque || "",
+                  modele: editVeh.modele || "",
+                  capacite_batterie: editVeh.capacite_batterie ?? null,
+                } as VehiculeSelectorValue}
+                onChange={(v) => setEditVeh({
+                  ...editVeh,
+                  marque: v.marque,
+                  modele: v.modele,
+                  capacite_batterie: v.capacite_batterie,
+                })}
+              />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-medium text-foreground">Immatriculation</label>
                   <input
                     className={`${inputCls} font-mono uppercase tracking-wide`}
                     value={editVeh.immatriculation || ""}
-                    maxLength={10}
+                    maxLength={9}
+                    placeholder="AB-123-CD"
                     onChange={e => setEditVeh({
                       ...editVeh,
-                      // BugID_014 — normalise : majuscules + lettres/chiffres uniquement
-                      immatriculation: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+                      immatriculation: normalizeImmat(e.target.value),
                     })}
                   />
-                  <p className="mt-1 text-[11px] text-muted-foreground">Lettres et chiffres uniquement — saisie auto-formatée.</p>
+                  {(() => {
+                    const err = editVeh.immatriculation ? getImmatError(editVeh.immatriculation) : null;
+                    return err ? <p className="mt-1 text-[11px] text-destructive">{err}</p> : null;
+                  })()}
                 </div>
                 <div><label className="text-sm font-medium text-foreground">VIN</label><input className={inputCls} value={editVeh.vin || ""} onChange={e => setEditVeh({ ...editVeh, vin: e.target.value })} /></div>
               </div>
-              <div><label className="text-sm font-medium text-foreground">Capacité batterie (kWh)</label><input type="number" step="0.1" className={inputCls} value={editVeh.capacite_batterie || ""} onChange={e => setEditVeh({ ...editVeh, capacite_batterie: e.target.value ? parseFloat(e.target.value) : null })} /></div>
               <div className="flex justify-end gap-3 pt-2">
                 <button onClick={() => setEditVeh(null)} disabled={savingEdit} className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">Annuler</button>
                 <button onClick={handleEditSave} disabled={savingEdit} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light disabled:opacity-50">

@@ -54,18 +54,31 @@
   --color-kpi-energy: var(--kpi-energy);
   --color-kpi-home: var(--kpi-home);
   --color-kpi-away: var(--kpi-away);
-  --font-sans: "Plus Jakarta Sans", "Inter", "Segoe UI", sans-serif;
-  --font-display: "Plus Jakarta Sans", "Inter", "Segoe UI", sans-serif;
+  /* CDC §8.2 — Police principale Univia Pro, fallback Inter puis Roboto. */
+  --font-sans: "Univia Pro", "Inter", "Roboto", "Segoe UI", sans-serif;
+  --font-display: "Univia Pro", "Inter", "Roboto", "Segoe UI", sans-serif;
 }
 
+/* ────────────────────────────────────────────────────────────────────
+   CDC §8.2 — Tokens visuels (référence unique, hex exacts).
+   Couleurs obligatoires de l'identité ChargiZ.
+   ──────────────────────────────────────────────────────────────────── */
 :root {
-  --radius: 0.75rem;
-  /* ChargiZ Brand Colors */
-  --chargiz-teal: oklch(0.38 0.06 190);
-  --chargiz-teal-light: oklch(0.45 0.06 190);
-  --chargiz-teal-dark: oklch(0.30 0.06 190);
-  --chargiz-lime: oklch(0.92 0.18 115);
-  --chargiz-lime-dark: oklch(0.80 0.18 115);
+  --radius: 0.75rem;            /* 12px — radius button mini, cf §8.4 */
+  --radius-card: 1rem;          /* 16px — radius card, cf §8.4 */
+
+  /* ChargiZ Brand Colors — alignés CDC §8.2 (hex exacts) */
+  --chargiz-teal: #225560;            /* Primary — vert pétrole */
+  --chargiz-teal-light: #2f6c7a;
+  --chargiz-teal-dark: #173e47;
+  --chargiz-lime: #B8CC3A;             /* Accent lime olive (couleur produit) */
+  --chargiz-lime-dark: #9DB02E;
+
+  /* Couleurs neutres CDC §8.2 */
+  --chargiz-bg: #FCFEF0;               /* Background light */
+  --chargiz-grey: #B3C0C6;             /* Neutral grey */
+  --chargiz-text: #0F172A;             /* Texte principal */
+  --chargiz-text-muted: #6B7280;       /* Texte secondaire */
 
   /* KPI Colors */
   --kpi-sessions: oklch(0.60 0.15 250);
@@ -73,26 +86,26 @@
   --kpi-home: oklch(0.70 0.12 60);
   --kpi-away: oklch(0.55 0.15 310);
 
-  /* Semantic Tokens - Light */
-  --background: oklch(0.985 0.004 210);
-  --foreground: oklch(0.145 0.04 220);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.20 0.04 220);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.20 0.04 220);
-  --primary: oklch(0.38 0.06 190);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.96 0.01 200);
-  --secondary-foreground: oklch(0.30 0.05 190);
-  --muted: oklch(0.96 0.005 220);
-  --muted-foreground: oklch(0.50 0.03 220);
-  --accent: oklch(0.92 0.18 115);
-  --accent-foreground: oklch(0.20 0.06 190);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.92 0.01 220);
-  --input: oklch(0.92 0.01 220);
-  --ring: oklch(0.38 0.06 190);
+  /* Semantic Tokens — pilotés par les hex CDC */
+  --background: #FFFFFF;               /* Fond plateforme blanc pur */
+  --foreground: #0F172A;               /* CDC §8.2 — Texte principal */
+  --card: #FFFFFF;                     /* Cards blanches — CDC §8.4 */
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #225560;                  /* Primary brand (vert pétrole) */
+  --primary-foreground: #FFFFFF;       /* Texte sur fond primary (sidebar actif etc.) */
+  --secondary: #F2F6F0;
+  --secondary-foreground: #225560;
+  --muted: #F4F7F0;
+  --muted-foreground: #6B7280;         /* CDC §8.2 — Texte secondaire */
+  --accent: #B8CC3A;                   /* Accent lime olive — chips, badges, CTA "Ajouter" */
+  --accent-foreground: #FFFFFF;        /* Texte blanc sur fond lime — contraste élevé */
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E2E8E0;                   /* Bordures fines (CDC §8.4 inputs) */
+  --input: #E2E8E0;
+  --ring: #225560;                     /* CDC §8.4 — focus vert pétrole */
   --chart-1: oklch(0.38 0.06 190);
   --chart-2: oklch(0.92 0.18 115);
   --chart-3: oklch(0.60 0.15 250);
@@ -156,20 +169,26 @@
 
   body {
     background-color: var(--color-background);
-    background-image:
-      radial-gradient(at 100% 0%, color-mix(in oklch, var(--chargiz-teal) 4%, transparent) 0%, transparent 40%),
-      radial-gradient(at 0% 100%, color-mix(in oklch, var(--chargiz-teal) 3%, transparent) 0%, transparent 45%);
-    background-attachment: fixed;
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    font-feature-settings: "ss01", "ss02", "cv11";
+    font-weight: 400;
+    /* Chiffres tabulaires + ligatures + variantes stylistiques */
+    font-feature-settings: "tnum" 1, "kern" 1, "liga" 1, "cv05" 1, "cv09" 1;
     letter-spacing: -0.011em;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    letter-spacing: -0.022em;
-    font-weight: 700;
-  }
+  /* CDC §8.2 — Hiérarchie typographique obligatoire */
+  h1 { font-size: 28px; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
+  h2 { font-size: 22px; font-weight: 600; line-height: 1.25; letter-spacing: -0.015em; }
+  h3 { font-size: 18px; font-weight: 600; line-height: 1.3; }
+  h4 { font-size: 16px; font-weight: 600; line-height: 1.35; }
+  h5, h6 { font-size: 14px; font-weight: 600; line-height: 1.4; }
+  small, .label { font-size: 12px; }
+
+  /* Boutons CTA : on garde le rendu standard vert pétrole + texte blanc
+     défini par les utilitaires Tailwind `bg-primary text-primary-foreground`,
+     très lisible. Le jaune fluo `--accent` est réservé aux badges/chips où
+     il associe avec un texte vert pétrole. */
 
   code, pre, kbd, samp,
   .font-mono {
@@ -237,7 +256,13 @@
 
 .sidebar-link {
   position: relative;
-  transition: transform 180ms ease, background-color 180ms ease, color 180ms ease;
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 200ms ease, color 200ms ease;
+}
+
+/* Léger glissement à droite au survol — rendu plus vivant et fluide */
+.sidebar-link:hover {
+  transform: translateX(3px);
 }
 
 .sidebar-link:hover .sidebar-icon {
@@ -435,4 +460,43 @@
     margin: 1cm;
     size: A4;
   }
+}
+
+/* ─── En-tête de tableau standard ChargiZ (teal #0f4b49, texte blanc) ───
+   Réutilisable partout où il y a une liste (collaborateurs, véhicules,
+   filiales, sites, entreprises…). On applique la classe sur le <thead>. */
+.cz-table-head,
+.cz-table-head tr {
+  background-color: #0f4b49;
+}
+.cz-table-head th {
+  background-color: #0f4b49;
+  color: #ffffff !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+/* Centrage uniforme des données dans toutes les listes (en-tête + cellules)
+   pour tout tableau muni de l'en-tête standard ChargiZ. */
+table:has(thead.cz-table-head) th,
+table:has(thead.cz-table-head) td {
+  text-align: center !important;
+}
+
+/* Exception : listes de collaborateurs — Prénom (col 1) et Nom (col 2) alignés
+   à gauche ; le reste des données reste centré. (Spécificité > règle ci-dessus.) */
+table.cz-table-collab th:nth-child(-n + 2),
+table.cz-table-collab td:nth-child(-n + 2) {
+  text-align: left !important;
+}
+
+/* Design simple & uniforme sur tous les boutons : transitions douces + léger
+   effet d'appui au clic (n'impacte pas la mise en page — transform uniquement). */
+button:not(:disabled) {
+  transition: transform 0.12s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, filter 0.15s ease;
+}
+button:not(:disabled):active {
+  transform: scale(0.97);
 }

@@ -15,6 +15,9 @@ interface KpiCardProps {
   icon: LucideIcon;
   /** Registre visuel — défaut : neutral */
   tone?: KpiTone;
+  /** Classe custom pour le conteneur d'icône (override le `tone`).
+   *  Ex : "bg-violet-100 text-violet-600". */
+  iconClass?: string;
   /** [Deprecated] ancienne API : classe Tailwind brute. Conservée pour compat le temps de la migration. */
   colorClass?: string;
 }
@@ -74,28 +77,25 @@ function inferToneFromColorClass(colorClass?: string): KpiTone {
   return "neutral";
 }
 
-export default function KpiCard({ title, value, subtitle, icon: Icon, tone, colorClass }: KpiCardProps) {
+export default function KpiCard({ title, value, subtitle, icon: Icon, tone, iconClass, colorClass }: KpiCardProps) {
   const effectiveTone: KpiTone = tone ?? inferToneFromColorClass(colorClass);
-  const styles = TONE_STYLES[effectiveTone];
+  const finalIconClass = iconClass || TONE_STYLES[effectiveTone].icon;
 
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1 min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 truncate">
-            {title}
-          </p>
-          <p className="text-2xl sm:text-[28px] leading-tight font-bold tracking-tight text-card-foreground tabular-nums">
-            <AnimatedValue raw={value} />
-          </p>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
-          )}
-        </div>
-        <div className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg ${styles.icon}`}>
-          <Icon className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2} />
-        </div>
+    <div className="group flex h-full flex-col rounded-xl border border-border border-b-2 border-b-[#0f4b49] bg-card p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
+      {/* Icône en haut à gauche, dans un carré coloré */}
+      <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${finalIconClass}`}>
+        <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
       </div>
+      {/* Titre */}
+      <p className="text-xs font-normal text-muted-foreground truncate">{title}</p>
+      {/* Valeur */}
+      <p className="mt-1 text-2xl leading-tight font-semibold tracking-tight text-card-foreground tabular-nums">
+        <AnimatedValue raw={value} />
+      </p>
+      {subtitle && (
+        <p className="mt-0.5 text-[11px] text-muted-foreground">{subtitle}</p>
+      )}
     </div>
   );
 }

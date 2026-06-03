@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useAuth, type AppRole } from "@/hooks/useAuth";
 import CreateUserDialog from "@/components/CreateUserDialog";
 import {
-  ShieldCheck, Eye, Users, Car, Database, BarChart3, KeyRound, Trash2, Plus, History
+  ShieldCheck, Eye, Users, Car, Database, BarChart3, KeyRound, Trash2, Plus, History, Activity
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/administration/")({
@@ -39,6 +39,7 @@ function getGroupsForRole(role: AppRole): ActionGroup[] {
       { title: "Données & Réglages", items: [
         { label: "Voir statistiques globales", icon: BarChart3, to: "/dashboard/statistiques" },
         { label: "Historique des modifications", icon: History, to: "/dashboard/administration/audit", hint: "Audit log de toute la plateforme" },
+        { label: "Erreurs Smartcar", icon: Activity, to: "/dashboard/administration/smartcar", hint: "Observabilité connecteur Smartcar" },
         { label: "Modifier mot de passe", icon: KeyRound, to: "/dashboard/reglages" },
       ]},
     ];

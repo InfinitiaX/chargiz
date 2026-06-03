@@ -166,6 +166,7 @@ export const api = {
       apiFetch<any>(`/api/filiales/${id}/unarchive`, { method: "PATCH" }),
     hardDelete: (id: string) =>
       apiFetch<any>(`/api/filiales/${id}/hard`, { method: "DELETE" }),
+    stats: (id: string) => apiFetch<any>(`/api/filiales/${id}/stats`),
   },
   sites: {
     list: (params?: Record<string, string>) => {
@@ -173,6 +174,7 @@ export const api = {
       return apiFetch<any[]>(`/api/sites${qs ? `?${qs}` : ""}`);
     },
     get: (id: string) => apiFetch<any>(`/api/sites/${id}`),
+    stats: (id: string) => apiFetch<any>(`/api/sites/${id}/stats`),
     create: (data: any) =>
       apiFetch<any>(`/api/sites`, { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: any) =>
@@ -221,7 +223,41 @@ export const api = {
     update: (id: string, data: any) => apiFetch<any>(`/api/vehicules/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   },
   me: {
+    profile: () => apiFetch<any>(`/api/me`),
+    update: (data: any) => apiFetch<any>(`/api/me`, { method: "PATCH", body: JSON.stringify(data) }),
+    requestEmailChange: (new_email: string) =>
+      apiFetch<{ ok: boolean; message: string }>(`/api/me/email`, {
+        method: "PATCH",
+        body: JSON.stringify({ new_email }),
+      }),
+    confirmEmailChange: (token: string) =>
+      apiFetch<{ ok: boolean; email: string }>(`/api/me/email/confirm`, {
+        method: "POST",
+        body: JSON.stringify({ token }),
+      }),
+    updateAdresses: (data: any) =>
+      apiFetch<any>(`/api/me/adresses`, { method: "PATCH", body: JSON.stringify(data) }),
+    updatePolicy: (data: { prix_kwh?: number | null; jours_fermeture?: number | null }) =>
+      apiFetch<{ ok: boolean; prix_kwh: number | null; jours_fermeture: number | null }>(
+        `/api/me/policy`,
+        { method: "PATCH", body: JSON.stringify(data) }
+      ),
+    performance: (params?: Record<string, string>) => {
+      const qs = params ? new URLSearchParams(params).toString() : "";
+      return apiFetch<any>(`/api/me/performance${qs ? `?${qs}` : ""}`);
+    },
+    sessions: (params?: Record<string, string>) => {
+      const qs = params ? new URLSearchParams(params).toString() : "";
+      return apiFetch<any[]>(`/api/me/sessions${qs ? `?${qs}` : ""}`);
+    },
     smartcarConnectUrl: () => apiFetch<{ smartcar_auth_url: string }>(`/api/me/smartcar/connect-url`),
+    setVehicule: (data: { marque: string; modele: string; immatriculation: string; capacite_batterie: number | null }) =>
+      apiFetch<{ ok: boolean; vehicule: any }>(`/api/me/vehicule`, { method: "POST", body: JSON.stringify(data) }),
+    // Liaison manuelle Smartcar (mode test uniquement — désactivé en live)
+    smartcarAvailableConnections: () =>
+      apiFetch<{ enabled: boolean; mode: string; connections: Array<{ vehicleId: string; userId: string; mode: string; connectedAt: string; linked: boolean; linkedToMe: boolean }> }>(`/api/me/smartcar/available-connections`),
+    smartcarLink: (data: { vehicleId: string; userId: string }) =>
+      apiFetch<{ ok: boolean; vehicule: any }>(`/api/me/smartcar/link`, { method: "POST", body: JSON.stringify(data) }),
   },
   sessions: {
     list: (params?: Record<string, string>) => {

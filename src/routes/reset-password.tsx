@@ -119,7 +119,7 @@ function ResetPasswordPage() {
               </div>
               <a
                 href="/"
-                className="inline-flex w-full items-center justify-center rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground transition-all hover:brightness-95 active:scale-[0.98]"
+                className="inline-flex w-full items-center justify-center rounded-xl bg-[#0f4b49] py-3 text-sm font-semibold text-white transition-all hover:bg-[#0d3f3d] active:scale-[0.98]"
               >
                 Retour à la connexion
               </a>
@@ -199,7 +199,7 @@ function ResetPasswordPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-xl bg-accent py-3 text-sm font-semibold text-accent-foreground transition-all hover:brightness-95 active:scale-[0.98] disabled:opacity-50"
+                  className="w-full rounded-xl bg-[#0f4b49] py-3 text-sm font-semibold text-white transition-all hover:bg-[#0d3f3d] active:scale-[0.98] disabled:opacity-50"
                 >
                   {loading ? "Modification en cours..." : "Modifier le mot de passe"}
                 </button>

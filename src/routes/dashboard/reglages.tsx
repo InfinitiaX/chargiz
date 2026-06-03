@@ -6,6 +6,7 @@ import { Building2, User, Shield, Save, Clock, CheckCircle2 } from "lucide-react
 import { toast } from "sonner";
 import AddressAutocomplete, { type AddressValue } from "@/components/AddressAutocomplete";
 import PhoneInput from "@/components/PhoneInput";
+import PolitiqueAvanceeSection from "@/components/PolitiqueAvanceeSection";
 
 export const Route = createFileRoute("/dashboard/reglages")({
   component: ReglagesPage,
@@ -28,12 +29,26 @@ function maskToJours(mask: number | null | undefined): string[] {
 function ReglagesPage() {
   const { profile, role, user, updatePassword } = useAuth();
   const isGestEntreprise = role === "gestionnaire_entreprise" || role === "superadmin";
+  const isGestFiliale = role === "gestionnaire_filiale";
+  const isGestSite = role === "gestionnaire_site";
   const entrepriseId = profile?.entreprise_id || "";
+  const filialeId = profile?.filiale_id || "";
+  const siteId = profile?.site_id || "";
 
   // ─── Entreprise (editable) ───
   const [entreprise, setEntreprise] = useState<any>({});
   const [entSaving, setEntSaving] = useState(false);
   const [entStatus, setEntStatus] = useState<{ ok?: string; err?: string }>({});
+
+  // ─── Filiale (Étape 1 Lot 2 — gestionnaire_filiale) ───
+  const [filiale, setFiliale] = useState<any>({});
+  const [filSaving, setFilSaving] = useState(false);
+  const [filStatus, setFilStatus] = useState<{ ok?: string; err?: string }>({});
+
+  // ─── Site (Étape 2 Lot 2 — gestionnaire_site) ───
+  const [site, setSite] = useState<any>({});
+  const [siteSaving, setSiteSaving] = useState(false);
+  const [siteStatus, setSiteStatus] = useState<{ ok?: string; err?: string }>({});
 
   // ─── Mon compte / Responsable entreprise (BugID_022) ───
   const [accountNom, setAccountNom] = useState("");
@@ -47,6 +62,8 @@ function ReglagesPage() {
   const [politique, setPolitique] = useState<any>(null);
   const [delegation, setDelegation] = useState<"entreprise" | "collaborateur">("entreprise");
   const [prixKwh, setPrixKwh] = useState("0.21");
+  // BugID_017 — feedback visuel quand une saisie est rejetée par le filtre
+  const [prixKwhHint, setPrixKwhHint] = useState<string | null>(null);
   const [joursEligibles, setJoursEligibles] = useState<string[]>(JOURS_DEFAULT);
   const [polSaving, setPolSaving] = useState(false);
   const [polStatus, setPolStatus] = useState<{ ok?: string; err?: string }>({});
@@ -79,12 +96,29 @@ function ReglagesPage() {
   useEffect(() => {
     if (!entrepriseId) return;
     loadData();
-  }, [entrepriseId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entrepriseId, filialeId, siteId]);
 
   async function loadData() {
     try {
       const ent = await api.entreprises.get(entrepriseId);
       if (ent) setEntreprise(ent);
+
+      // Filiale du gestionnaire (Étape 1 Lot 2)
+      if (filialeId) {
+        try {
+          const fil = await api.filiales.get(filialeId);
+          if (fil) setFiliale(fil);
+        } catch { /* ignore */ }
+      }
+
+      // Site du gestionnaire (Étape 2 Lot 2)
+      if (siteId) {
+        try {
+          const s = await api.sites.get(siteId);
+          if (s) setSite(s);
+        } catch { /* ignore */ }
+      }
 
       const pols = await api.politiques.list({ entreprise_id: entrepriseId });
       if (pols.length > 0) {
@@ -98,6 +132,61 @@ function ReglagesPage() {
       console.error("Error loading settings:", err);
     }
   }
+
+  // ─── Save filiale (Étape 1 Lot 2) ───
+  const saveFiliale = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFilStatus({});
+    setFilSaving(true);
+    try {
+      const updated = await api.filiales.update(filialeId, {
+        nom: filiale.nom,
+        siret: filiale.siret || null,
+        numero_tva: filiale.numero_tva || null,
+        telephone: filiale.telephone || null,
+        adresse: filiale.adresse || null,
+        code_postal: filiale.code_postal || null,
+        ville: filiale.ville || null,
+        responsable_nom: filiale.responsable_nom || null,
+        responsable_prenom: filiale.responsable_prenom || null,
+        responsable_email: filiale.responsable_email || null,
+        responsable_telephone: filiale.responsable_telephone || null,
+      });
+      setFiliale(updated);
+      setFilStatus({ ok: "Informations filiale enregistrées." });
+    } catch (err: any) {
+      setFilStatus({ err: err.message || "Erreur lors de l'enregistrement." });
+    } finally {
+      setFilSaving(false);
+    }
+  };
+
+  // ─── Save site (Étape 2 Lot 2) ───
+  const saveSite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSiteStatus({});
+    setSiteSaving(true);
+    try {
+      const updated = await api.sites.update(siteId, {
+        nom: site.nom,
+        siret: site.siret || null,
+        telephone: site.telephone || null,
+        adresse: site.adresse || null,
+        code_postal: site.code_postal || null,
+        ville: site.ville || null,
+        responsable_nom: site.responsable_nom || null,
+        responsable_prenom: site.responsable_prenom || null,
+        responsable_email: site.responsable_email || null,
+        responsable_telephone: site.responsable_telephone || null,
+      });
+      setSite(updated);
+      setSiteStatus({ ok: "Informations site enregistrées." });
+    } catch (err: any) {
+      setSiteStatus({ err: err.message || "Erreur lors de l'enregistrement." });
+    } finally {
+      setSiteSaving(false);
+    }
+  };
 
   // ─── Save handlers ───
   const saveEntreprise = async (e: React.FormEvent) => {
@@ -152,8 +241,18 @@ function ReglagesPage() {
   const savePolitique = async () => {
     if (!entrepriseId) return;
     setPolStatus({});
+    // BugID_017 — format décimal strict, 2 chiffres max
+    const rawTrimmed = (prixKwh || "").trim();
+    if (!rawTrimmed) {
+      setPolStatus({ err: "Le coût du kWh est requis." });
+      return;
+    }
+    if (!/^\d+(\.\d{1,3})?$/.test(rawTrimmed)) {
+      setPolStatus({ err: "Format invalide : le coût du kWh doit être un nombre décimal (ex : 0,18)." });
+      return;
+    }
     // BugID_025 — strict positif
-    const priceNum = parseFloat(prixKwh);
+    const priceNum = parseFloat(rawTrimmed);
     if (!isFinite(priceNum) || priceNum <= 0) {
       setPolStatus({ err: "Le coût du kWh doit être strictement positif." });
       return;
@@ -258,10 +357,201 @@ function ReglagesPage() {
     <div className="p-4 sm:p-6 md:p-8">
       <div className="mb-8">
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Réglages</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Paramètres de l'entreprise, du compte et politique de recharge</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isGestFiliale
+            ? "Paramètres de votre filiale, du compte et politique de recharge"
+            : isGestSite
+              ? "Paramètres de votre site, du compte et politique de recharge"
+              : "Paramètres de l'entreprise, du compte et politique de recharge"}
+        </p>
       </div>
 
       <div className="max-w-3xl space-y-6">
+
+        {/* ─── Ma filiale (gestionnaire_filiale — Étape 1 Lot 2) ─── */}
+        {isGestFiliale && filialeId && (
+          <div className="rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex items-center gap-3 border-b border-border px-6 py-4">
+              <Building2 className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold text-card-foreground">Ma filiale</h3>
+            </div>
+            <form onSubmit={saveFiliale} className="p-6 space-y-4">
+              <Status s={filStatus} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted-foreground">Nom *</label>
+                  <input required className={`mt-1 ${inputCls}`} value={filiale.nom || ""} onChange={e => setFiliale({ ...filiale, nom: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">SIRET</label>
+                  <input maxLength={14} className={`mt-1 ${inputCls} font-mono`} value={filiale.siret || ""} onChange={e => setFiliale({ ...filiale, siret: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">N° TVA</label>
+                  <input className={`mt-1 ${inputCls}`} value={filiale.numero_tva || ""} onChange={e => setFiliale({ ...filiale, numero_tva: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Téléphone</label>
+                  <div className="mt-1">
+                    <PhoneInput
+                      value={filiale.telephone || ""}
+                      onChange={(e164) => setFiliale({ ...filiale, telephone: e164 })}
+                      defaultCountry="FR"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2">
+                <label className="text-xs text-muted-foreground">Adresse</label>
+                <div className="mt-1">
+                  <AddressAutocomplete
+                    hideCountry
+                    value={{
+                      pays_code: "FR",
+                      adresse: filiale.adresse || "",
+                      code_postal: filiale.code_postal || "",
+                      ville: filiale.ville || "",
+                      latitude: null,
+                      longitude: null,
+                    }}
+                    onChange={(v: AddressValue) => setFiliale({
+                      ...filiale,
+                      adresse: v.adresse,
+                      code_postal: v.code_postal,
+                      ville: v.ville,
+                    })}
+                  />
+                </div>
+              </div>
+              {/* Responsable de la filiale */}
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Responsable de la filiale</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Prénom</label>
+                    <input className={`mt-1 ${inputCls}`} value={filiale.responsable_prenom || ""} onChange={e => setFiliale({ ...filiale, responsable_prenom: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Nom</label>
+                    <input className={`mt-1 ${inputCls}`} value={filiale.responsable_nom || ""} onChange={e => setFiliale({ ...filiale, responsable_nom: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Email</label>
+                    <input type="email" className={`mt-1 ${inputCls}`} value={filiale.responsable_email || ""} onChange={e => setFiliale({ ...filiale, responsable_email: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Téléphone</label>
+                    <div className="mt-1">
+                      <PhoneInput
+                        value={filiale.responsable_telephone || ""}
+                        onChange={(e164) => setFiliale({ ...filiale, responsable_telephone: e164 })}
+                        defaultCountry="FR"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="pt-2">
+                <button type="submit" disabled={filSaving} className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:brightness-95 disabled:opacity-50">
+                  <Save className="h-4 w-4" /> {filSaving ? "Enregistrement..." : "Enregistrer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ─── Mon site (gestionnaire_site — Étape 2 Lot 2) ─── */}
+        {isGestSite && siteId && (
+          <div className="rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex items-center gap-3 border-b border-border px-6 py-4">
+              <Building2 className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold text-card-foreground">Mon site</h3>
+            </div>
+            <form onSubmit={saveSite} className="p-6 space-y-4">
+              <Status s={siteStatus} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted-foreground">Nom *</label>
+                  <input required className={`mt-1 ${inputCls}`} value={site.nom || ""} onChange={e => setSite({ ...site, nom: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">SIRET</label>
+                  <input maxLength={14} className={`mt-1 ${inputCls} font-mono`} value={site.siret || ""} onChange={e => setSite({ ...site, siret: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Téléphone</label>
+                  <div className="mt-1">
+                    <PhoneInput
+                      value={site.telephone || ""}
+                      onChange={(e164) => setSite({ ...site, telephone: e164 })}
+                      defaultCountry="FR"
+                    />
+                  </div>
+                </div>
+                <div className="sm:row-start-2">
+                  <label className="text-xs text-muted-foreground">Filiale de rattachement</label>
+                  <input disabled className={`mt-1 ${inputCls} bg-muted/40 cursor-not-allowed`} value={site.filiale_id || filialeId || "—"} />
+                  <p className="mt-1 text-[10px] text-muted-foreground italic">Géré par la filiale supérieure</p>
+                </div>
+              </div>
+              <div className="mt-2">
+                <label className="text-xs text-muted-foreground">Adresse</label>
+                <div className="mt-1">
+                  <AddressAutocomplete
+                    hideCountry
+                    value={{
+                      pays_code: "FR",
+                      adresse: site.adresse || "",
+                      code_postal: site.code_postal || "",
+                      ville: site.ville || "",
+                      latitude: null,
+                      longitude: null,
+                    }}
+                    onChange={(v: AddressValue) => setSite({
+                      ...site,
+                      adresse: v.adresse,
+                      code_postal: v.code_postal,
+                      ville: v.ville,
+                    })}
+                  />
+                </div>
+              </div>
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Responsable du site</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Prénom</label>
+                    <input className={`mt-1 ${inputCls}`} value={site.responsable_prenom || ""} onChange={e => setSite({ ...site, responsable_prenom: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Nom</label>
+                    <input className={`mt-1 ${inputCls}`} value={site.responsable_nom || ""} onChange={e => setSite({ ...site, responsable_nom: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Email</label>
+                    <input type="email" className={`mt-1 ${inputCls}`} value={site.responsable_email || ""} onChange={e => setSite({ ...site, responsable_email: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Téléphone</label>
+                    <div className="mt-1">
+                      <PhoneInput
+                        value={site.responsable_telephone || ""}
+                        onChange={(e164) => setSite({ ...site, responsable_telephone: e164 })}
+                        defaultCountry="FR"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="pt-2">
+                <button type="submit" disabled={siteSaving} className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:brightness-95 disabled:opacity-50">
+                  <Save className="h-4 w-4" /> {siteSaving ? "Enregistrement..." : "Enregistrer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Informations entreprise (editable) */}
         {isGestEntreprise && entrepriseId && (
           <div className="rounded-xl border border-border bg-card shadow-sm">
@@ -447,28 +737,40 @@ function ReglagesPage() {
                 </p>
                 <div className="flex items-center gap-3">
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max="5"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0,18"
                     value={prixKwh}
                     onChange={e => {
-                      // BugID_017/025 — chiffres + un seul "." ; max 2 décimales ; pas de signe "-"
+                      // BugID_017 — chiffres + un seul "." ; max 2 décimales ; feedback visuel sur rejet
                       const raw = e.target.value.replace(",", ".");
-                      if (raw === "") { setPrixKwh(""); return; }
-                      if (!/^\d*(\.\d{0,2})?$/.test(raw)) return;
+                      if (raw === "") { setPrixKwh(""); setPrixKwhHint(null); return; }
+                      if (!/^\d*(\.\d{0,2})?$/.test(raw)) {
+                        if (/[^\d.,]/.test(raw))    setPrixKwhHint("Caractères non numériques refusés.");
+                        else if (/\.\d{3,}/.test(raw)) setPrixKwhHint("Maximum 2 décimales (ex : 0,18).");
+                        else                        setPrixKwhHint("Format invalide.");
+                        setTimeout(() => setPrixKwhHint(null), 2500);
+                        return;
+                      }
+                      setPrixKwhHint(null);
                       setPrixKwh(raw);
                     }}
                     onBlur={() => {
-                      // Re-formate sur perte de focus : 0.185 → 0.19, "abc" → reset à 0.21
+                      // Re-formate sur perte de focus : 0.185 → 0.19, vide → 0.21
                       const f = parseFloat(prixKwh);
                       if (!isFinite(f) || f <= 0) { setPrixKwh("0.21"); return; }
-                      setPrixKwh(f.toFixed(2));
+                      const rounded = Math.round((f + 1e-9) * 100) / 100;
+                      setPrixKwh(rounded.toFixed(2));
                     }}
-                    inputMode="decimal"
-                    className={`${inputCls} max-w-[160px]`}
+                    className={`${inputCls} max-w-[160px] ${prixKwhHint ? "border-amber-400 ring-2 ring-amber-200" : ""}`}
                   />
-                  <span className="text-xs text-muted-foreground">Tarif moyen en France : 0,21 €/kWh — strictement positif, ≤ 5</span>
+                  <span className="text-xs text-muted-foreground">
+                    {prixKwhHint ? (
+                      <span className="text-amber-700 font-medium">{prixKwhHint}</span>
+                    ) : (
+                      "Tarif moyen en France : 0,21 €/kWh — strictement positif, ≤ 5, 2 décimales max."
+                    )}
+                  </span>
                 </div>
               </div>
 
@@ -495,6 +797,11 @@ function ReglagesPage() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Étape 4 Lot 2 — Politique avancée (HP/HC + fermetures + délégation 4 niveaux) */}
+        {isGestEntreprise && entrepriseId && (
+          <PolitiqueAvanceeSection entrepriseId={entrepriseId} />
         )}
       </div>
     </div>

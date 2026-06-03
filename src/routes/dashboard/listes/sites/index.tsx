@@ -1,18 +1,20 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AlertCircle, Archive, ArchiveRestore, Download, Eye, Loader2, MapPin, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import CreateSiteDialog from "@/components/CreateSiteDialog";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
-import EntityDetailsDialog, { type DetailSection } from "@/components/EntityDetailsDialog";
 import IconTooltip from "@/components/IconTooltip";
 import EmptyState from "@/components/EmptyState";
 import PageSkeleton from "@/components/PageSkeleton";
+import TablePagination from "@/components/TablePagination";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { exportXLSX } from "@/lib/export";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/dashboard/listes/sites")({
+const PAGE_SIZE = 25;
+
+export const Route = createFileRoute("/dashboard/listes/sites/")({
   component: ListeSites,
   head: () => ({ meta: [{ title: "ChargiZ — Sites" }] }),
 });
@@ -43,15 +45,16 @@ interface Filiale {
 
 function ListeSites() {
   const { role, loading } = useAuth();
+  const navigate = useNavigate();
   const [sites, setSites] = useState<Site[]>([]);
   const [filiales, setFiliales] = useState<Filiale[]>([]);
   const [search, setSearch] = useState("");
   const [filterFilialeId, setFilterFilialeId] = useState<string>("");
   const [dataLoading, setDataLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   // Dialogs
   const [showAdd, setShowAdd] = useState(false);
-  const [viewing, setViewing] = useState<Site | null>(null);
   const [editing, setEditing] = useState<Site | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<Site | null>(null);
   const [hardDeleteTarget, setHardDeleteTarget] = useState<Site | null>(null);
@@ -60,11 +63,12 @@ function ListeSites() {
 
   const canAccess =
     role === "superadmin" ||
+    role === "admin" ||
     role === "gestionnaire_entreprise" ||
     role === "gestionnaire_filiale" ||
     role === "gestionnaire_site";
   // Voir = tous, Modifier/Archiver/Désarchiver = sup + gest. entreprise + filiale
-  const canManage = role === "superadmin" || role === "gestionnaire_entreprise" || role === "gestionnaire_filiale";
+  const canManage = role === "superadmin" || role === "admin" || role === "gestionnaire_entreprise" || role === "gestionnaire_filiale";
   // Suppression définitive = superadmin uniquement
   const canHardDelete = role === "superadmin";
 
@@ -162,45 +166,9 @@ function ListeSites() {
     return `${s.nom} ${s.ville || ""} ${s.responsable_email || ""}`.toLowerCase().includes(search.toLowerCase());
   });
 
-  // Sections du dialog de visualisation
-  const viewSections: DetailSection[] = viewing ? [
-    {
-      title: "Identification",
-      fields: [
-        { label: "Nom du site", value: viewing.nom },
-        { label: "Filiale", value: filialeName(viewing.filiale_id) },
-        { label: "SIRET", value: viewing.siret, mono: true },
-        { label: "État", value: viewing.is_active
-          ? <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-chargiz-teal/10 text-chargiz-teal">Actif</span>
-          : <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-destructive/10 text-destructive">Archivé</span>
-        },
-      ],
-    },
-    {
-      title: "Coordonnées",
-      fields: [
-        { label: "Adresse", value: viewing.adresse },
-        { label: "Code postal", value: viewing.code_postal },
-        { label: "Ville", value: viewing.ville },
-        { label: "Téléphone", value: viewing.telephone, mono: true },
-      ],
-    },
-    {
-      title: "Responsable",
-      fields: [
-        { label: "Prénom", value: viewing.responsable_prenom },
-        { label: "Nom", value: viewing.responsable_nom },
-        { label: "Email", value: viewing.responsable_email },
-        { label: "Téléphone direct", value: viewing.responsable_telephone, mono: true },
-      ],
-    },
-    {
-      title: "Création",
-      fields: [
-        { label: "Créé le", value: new Date(viewing.created_at).toLocaleDateString("fr-FR") },
-      ],
-    },
-  ] : [];
+  // Pagination (BugID_011 — consistance avec collaborateurs/véhicules/entreprises)
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="p-4 sm:p-6 md:p-8">
@@ -236,11 +204,11 @@ function ListeSites() {
       <div className="mb-6 flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input type="text" placeholder="Rechercher par nom, ville..." value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="Rechercher par nom, ville..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
             className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
         </div>
         {filiales.length > 1 && (
-          <select value={filterFilialeId} onChange={e => setFilterFilialeId(e.target.value)}
+          <select value={filterFilialeId} onChange={e => { setFilterFilialeId(e.target.value); setPage(1); }}
             className="rounded-lg border border-input bg-card px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
             <option value="">Toutes les filiales</option>
             {filiales.map(f => <option key={f.id} value={f.id}>{f.nom}</option>)}
@@ -251,7 +219,7 @@ function ListeSites() {
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="cz-table-head">
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Site</th>
                 <th className="px-6 py-3 text-left font-medium text-muted-foreground">Filiale</th>
@@ -277,8 +245,12 @@ function ListeSites() {
                     />
                   </td>
                 </tr>
-              ) : filtered.map(s => (
-                <tr key={s.id} className={`hover:bg-muted/30 transition-colors ${!s.is_active ? "opacity-60" : ""}`}>
+              ) : paginated.map(s => (
+                <tr
+                  key={s.id}
+                  onClick={() => navigate({ to: "/dashboard/listes/sites/$id", params: { id: s.id } })}
+                  className={`hover:bg-muted/30 transition-colors cursor-pointer ${!s.is_active ? "opacity-60" : ""}`}
+                >
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="font-medium text-card-foreground">{s.nom}</span>
@@ -295,12 +267,16 @@ function ListeSites() {
                       {s.is_active ? "Actif" : "Archivé"}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-2">
                       <IconTooltip label="Voir la fiche">
-                        <button onClick={() => setViewing(s)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <Link
+                          to="/dashboard/listes/sites/$id"
+                          params={{ id: s.id }}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
                           <Eye className="h-4 w-4" />
-                        </button>
+                        </Link>
                       </IconTooltip>
                       {canManage && (
                         <>
@@ -346,6 +322,15 @@ function ListeSites() {
         </div>
       </div>
 
+      {/* Pagination */}
+      <TablePagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={filtered.length}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
+
       {/* Création */}
       <CreateSiteDialog
         open={showAdd}
@@ -363,29 +348,6 @@ function ListeSites() {
         filialeId={editing?.filiale_id}
         selectableFiliales={filiales}
         editing={editing}
-      />
-
-      {/* Visualisation */}
-      <EntityDetailsDialog
-        open={!!viewing}
-        onClose={() => setViewing(null)}
-        title={viewing?.nom || ""}
-        subtitle={viewing ? filialeName(viewing.filiale_id) : "Site"}
-        icon={MapPin}
-        sections={viewSections}
-        footer={canManage && viewing ? (
-          <>
-            <button onClick={() => setViewing(null)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
-              Fermer
-            </button>
-            <button
-              onClick={() => { setEditing(viewing); setViewing(null); }}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-chargiz-teal-light"
-            >
-              <Pencil className="h-4 w-4" /> Modifier
-            </button>
-          </>
-        ) : null}
       />
 
       {/* Archivage (soft) */}

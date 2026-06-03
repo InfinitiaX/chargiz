@@ -12,7 +12,6 @@ import {
   Car,
   Building2,
   MapPin,
-  ChevronDown,
   ChevronRight,
   List,
   ShieldCheck,
@@ -72,6 +71,10 @@ export default function DashboardSidebar() {
   // Périmètre par rôle (CDC §1.2 + §6.2 — Lot 2 Étape 1/2/3)
   const getListesItems = (): NavItem[] => {
     const items: NavItem[] = [];
+    // Admins : superadmin uniquement (CDC §1.2.1 — gestion des comptes Admin)
+    if (role === "superadmin") {
+      items.push({ to: "/dashboard/administration/admins", icon: ShieldCheck, label: "Admins" });
+    }
     // Entreprises : superadmin (toutes) + admin (celles attribuées)
     if (role === "superadmin" || role === "admin") {
       items.push({ to: "/dashboard/listes/entreprises", icon: Building2, label: "Entreprises" });
@@ -208,7 +211,7 @@ export default function DashboardSidebar() {
             className={`${linkBase} ${location.pathname === "/dashboard" ? linkActive : linkIdle}`}
           >
             <LayoutDashboard className="sidebar-icon h-5 w-5" />
-            Dashboard
+            {role === "gestionnaire_entreprise" ? "Accueil" : "Dashboard"}
           </Link>
 
           <Link
@@ -225,27 +228,36 @@ export default function DashboardSidebar() {
           >
             <List className="sidebar-icon h-5 w-5" />
             Listes
-            {listesOpen ? <ChevronDown className="ml-auto h-4 w-4" /> : <ChevronRight className="ml-auto h-4 w-4" />}
+            <ChevronRight
+              className={`ml-auto h-4 w-4 transition-transform duration-300 ease-in-out ${listesOpen ? "rotate-90" : ""}`}
+            />
           </button>
-          {listesOpen && (
-            <div className="ml-4 space-y-0.5">
-              {listesItems.map((item) => {
-                const isActive = location.pathname.startsWith(item.to);
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    className={`sidebar-link flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-semibold tracking-tight ${
-                      isActive ? linkActive : "text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground"
-                    }`}
-                  >
-                    <item.icon className="sidebar-icon h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
+          {/* Sous-menu animé : hauteur + opacité fluides (grid 0fr→1fr) */}
+          <div
+            className={`grid transition-all duration-300 ease-in-out ${
+              listesOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="ml-4 space-y-0.5 pt-0.5">
+                {listesItems.map((item) => {
+                  const isActive = location.pathname.startsWith(item.to);
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      className={`sidebar-link flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-semibold tracking-tight ${
+                        isActive ? linkActive : "text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground"
+                      }`}
+                    >
+                      <item.icon className="sidebar-icon h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          )}
+          </div>
 
           {(role === "superadmin" || role === "admin" || role === "gestionnaire_entreprise") && (
             <Link

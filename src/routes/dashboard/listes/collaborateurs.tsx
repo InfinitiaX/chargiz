@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
-import { AlertCircle, Archive, ArchiveRestore, Download, Eye, Plus, Search, Upload, Trash2, Users } from "lucide-react";
+import { AlertCircle, Archive, ArchiveRestore, Download, Eye, Plus, Search, Upload, Trash2, Users, X } from "lucide-react";
 import CreateCollaborateurDialog from "@/components/CreateCollaborateurDialog";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import TablePagination from "@/components/TablePagination";
@@ -11,6 +11,7 @@ import IconTooltip from "@/components/IconTooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { apiFetch } from "@/lib/api";
 import { exportXLSX } from "@/lib/export";
+import { normalizeImmat } from "@/lib/immat";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 25;
@@ -69,8 +70,30 @@ function ListeCollaborateurs() {
   const [search, setSearch] = useState("");
   // BugID_034 — masquer les archivés par défaut, toggle pour les inclure
   const [includeArchived, setIncludeArchived] = useState(false);
+  // Filtres organisationnels (filiale/site) + période — alignés sur le dashboard
+  const [filiales, setFiliales] = useState<Array<{ id: string; nom: string }>>([]);
+  const [sitesList, setSitesList] = useState<Array<{ id: string; nom: string; filiale_id?: string | null }>>([]);
+  const [selectedFiliale, setSelectedFiliale] = useState<string>("");
+  const [selectedSite, setSelectedSite] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 1); d.setDate(1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [dateTo, setDateTo] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  // Toggle unité affichage (kWh / €) — n'impacte QUE la colonne "Recharge domicile"
+  const [unit, setUnit] = useState<"kwh" | "eur">("kwh");
   const [showAdd, setShowAdd] = useState(false);
   const [importing, setImporting] = useState(false);
+  // BugID_032 — rapport d'import detaille (modal)
+  const [importReport, setImportReport] = useState<{
+    total_rows: number;
+    success_count: number;
+    error_count: number;
+    skipped_count: number;
+    created: { row: number; email: string; nom: string; prenom: string }[];
+    errors:  { row: number; email: string | null; field: string | null; reason: string }[];
+    skipped: { row: number; email: string; reason: string }[];
+  } | null>(null);
   /** ID du collaborateur en cours de traitement (archive/unarchive). */
   const [processingId, setProcessingId] = useState<string | null>(null);
   /** Collaborateur ciblé par la suppression — ouvre l'AlertDialog. */
@@ -84,20 +107,50 @@ function ListeCollaborateurs() {
   useEffect(() => {
     if (loading) return;
     loadData();
-  }, [loading, entrepriseId, includeArchived]);
+  }, [loading, entrepriseId, includeArchived, selectedFiliale, selectedSite, dateFrom, dateTo]);
+
+  // Charge filiales (au montage / changement entreprise) et sites (au changement filiale)
+  useEffect(() => {
+    if (loading || !entrepriseId) return;
+    const qs = new URLSearchParams({ entreprise_id: entrepriseId, active_only: "true" });
+    apiFetch<any[]>(`/api/filiales?${qs.toString()}`)
+      .then((d) => setFiliales(d.map((f: any) => ({ id: f.id, nom: f.nom }))))
+      .catch(() => setFiliales([]));
+  }, [loading, entrepriseId]);
+
+  useEffect(() => {
+    if (loading) return;
+    // Reset le site quand on change de filiale
+    setSelectedSite("");
+    if (!selectedFiliale) { setSitesList([]); return; }
+    const qs = new URLSearchParams({ filiale_id: selectedFiliale, active_only: "true" });
+    apiFetch<any[]>(`/api/sites?${qs.toString()}`)
+      .then((d) => setSitesList(d.map((s: any) => ({ id: s.id, nom: s.nom, filiale_id: s.filiale_id }))))
+      .catch(() => setSitesList([]));
+  }, [loading, selectedFiliale]);
 
   async function loadData() {
     // BugID_034 — par défaut, on demande explicitement active_only=true (archivés masqués) ;
     // le toggle "Inclure archivés" repasse à l'appel non filtré (back-end renvoie tout).
     const qs = new URLSearchParams();
     if (entrepriseId) qs.set("entreprise_id", entrepriseId);
+    if (selectedFiliale) qs.set("filiale_id", selectedFiliale);
+    if (selectedSite) qs.set("site_id", selectedSite);
     if (!includeArchived) qs.set("active_only", "true");
     const params = qs.toString() ? `?${qs.toString()}` : "";
+
+    // qsRoot — sert pour les listes véhicules/sessions (mêmes filtres organisationnels)
+    const qsRoot = new URLSearchParams();
+    if (entrepriseId) qsRoot.set("entreprise_id", entrepriseId);
+    if (selectedFiliale) qsRoot.set("filiale_id", selectedFiliale);
+    if (selectedSite) qsRoot.set("site_id", selectedSite);
+    const paramsRoot = qsRoot.toString() ? `?${qsRoot.toString()}` : "";
+
     const [collabs, ents, vehicules, sessions] = await Promise.all([
       apiFetch<Collab[]>(`/api/collaborateurs${params}`),
       isSuperadmin ? apiFetch<any[]>("/api/entreprises") : Promise.resolve([] as any[]),
-      apiFetch<Vehicule[]>(`/api/vehicules${entrepriseId ? `?entreprise_id=${entrepriseId}` : ""}`).catch(() => [] as Vehicule[]),
-      apiFetch<Session[]>(`/api/sessions${entrepriseId ? `?entreprise_id=${entrepriseId}` : ""}`).catch(() => [] as Session[]),
+      apiFetch<Vehicule[]>(`/api/vehicules${paramsRoot}`).catch(() => [] as Vehicule[]),
+      apiFetch<Session[]>(`/api/sessions${paramsRoot}`).catch(() => [] as Session[]),
     ]);
 
     // Indexe le véhicule de chaque collab (1 véhicule par collab actuellement)
@@ -107,9 +160,18 @@ function ListeCollaborateurs() {
     }
     setVehiculesByCollab(vMap);
 
+    // Filtre sessions par période (si plage valide)
+    const validRange = dateFrom && dateTo && dateFrom <= dateTo;
+    const fromTs = validRange ? `${dateFrom}T00:00:00` : null;
+    const toTs   = validRange ? `${dateTo}T23:59:59`   : null;
+    const filteredSessions = !validRange ? sessions : sessions.filter((s: any) => {
+      const d = s.date_session || s.date_debut;
+      return d && d >= fromTs! && d <= toTs!;
+    });
+
     // Agrège les sessions par collab : kWh dom, € dom, kWh hors dom
     const agg = new Map<string, { domKwh: number; domEur: number; horsKwh: number }>();
-    for (const s of sessions) {
+    for (const s of filteredSessions) {
       const cur = agg.get(s.collaborateur_id) || { domKwh: 0, domEur: 0, horsKwh: 0 };
       if (s.is_domicile) {
         cur.domKwh += s.energie_kwh || 0;
@@ -121,11 +183,12 @@ function ListeCollaborateurs() {
     }
     setSessionsAgg(agg);
 
-    // Charge les KPIs serveur (conso moyenne, CO2, dernier km) en parallèle
+    // Charge les KPIs serveur (conso moyenne, CO2, dernier km) en parallèle — scopés sur la période
+    const kpiQs = validRange ? `?date_from=${dateFrom}&date_to=${dateTo}T23:59:59` : "";
     const kpisResults = await Promise.all(
       collabs.map(async (c) => {
         try {
-          const k = await apiFetch<any>(`/api/collaborateurs/${c.id}/kpis`);
+          const k = await apiFetch<any>(`/api/collaborateurs/${c.id}/kpis${kpiQs}`);
           return [c.id, { conso: k.conso_moyenne_kwh_100km, co2: k.co2_evite_kg, km: k.dernier_km }] as const;
         } catch {
           return [c.id, { conso: null, co2: null, km: null }] as const;
@@ -244,16 +307,26 @@ function ListeCollaborateurs() {
     reader.onload = async (event) => {
       const text = event.target?.result as string;
       try {
-        await apiFetch("/api/collaborateurs/import/csv", {
+        // BugID_032 — recupere le rapport detaille
+        const report = await apiFetch<any>("/api/collaborateurs/import/csv", {
           method: "POST",
           body: JSON.stringify({ file_content: text }),
         });
-        toast.success("Importation réussie");
-        loadData();
-      } catch (err) {
+        setImportReport(report);
+        if (report.success_count > 0) {
+          toast.success(`${report.success_count} collaborateur(s) importé(s)`, {
+            description: report.message,
+          });
+          loadData();
+        } else {
+          toast.error("Aucun collaborateur importé", {
+            description: report.message || "Voir le détail des erreurs dans la fenêtre.",
+          });
+        }
+      } catch (err: any) {
         console.error(err);
         toast.error("Erreur d'importation", {
-          description: "Vérifiez le format du CSV : Nom, Prénom, Email, Téléphone.",
+          description: err?.message || "Vérifiez le format du CSV : Nom, Prénom, Email, Téléphone.",
         });
       } finally {
         setImporting(false);
@@ -261,6 +334,31 @@ function ListeCollaborateurs() {
       }
     };
     reader.readAsText(file);
+  };
+
+  // BugID_030 — modèle d'import téléchargeable (colonnes attendues par l'API)
+  const downloadTemplate = () => {
+    const headers = ["Nom", "Prénom", "Email", "Téléphone"];
+    const examples = [
+      ["Ndiaye", "Awa", "awa.ndiaye@exemple.com", "0612345678"],
+      ["Martin", "Paul", "paul.martin@exemple.com", ""],
+    ];
+    const sep = ";"; // Excel FR ; l'import sniffe automatiquement ; , ou tab
+    const lines = [headers.join(sep), ...examples.map((r) => r.join(sep))];
+    const csv = "﻿" + lines.join("\r\n"); // BOM UTF-8 pour Excel
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "modele_import_collaborateurs.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Modèle téléchargé", {
+      description: "Colonnes : Nom, Prénom, Email (requis) + Téléphone (optionnel).",
+      duration: 4000,
+    });
   };
 
   const filtered = collaborateurs.filter((collab) =>
@@ -315,6 +413,9 @@ function ListeCollaborateurs() {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+          <button onClick={downloadTemplate} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
+            <Download className="h-4 w-4" /> Télécharger le modèle
+          </button>
           <button onClick={handleImportClick} disabled={importing} className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
             <Upload className="h-4 w-4" /> {importing ? "Import..." : "Importer CSV"}
           </button>
@@ -348,7 +449,7 @@ function ListeCollaborateurs() {
         </div>
       </div>
 
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -356,9 +457,82 @@ function ListeCollaborateurs() {
             placeholder="Rechercher par nom, email..."
             value={search}
             onChange={(event) => handleSearchChange(event.target.value)}
-            className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm outline-none shadow-sm transition-all hover:border-[#0f4b49]/40 focus:border-[#0f4b49] focus:ring-2 focus:ring-[#0f4b49]/20"
           />
         </div>
+
+        {/* Filiale */}
+        <select
+          value={selectedFiliale}
+          onChange={(e) => { setSelectedFiliale(e.target.value); setPage(1); }}
+          className="rounded-lg border border-input bg-card px-3 py-2.5 text-sm text-foreground shadow-sm transition-all hover:border-[#0f4b49]/40 focus:border-[#0f4b49] focus:ring-2 focus:ring-[#0f4b49]/20"
+        >
+          <option value="">Toutes les filiales</option>
+          {filiales.map((f) => (
+            <option key={f.id} value={f.id}>{f.nom}</option>
+          ))}
+        </select>
+
+        {/* Site (visible seulement si une filiale est choisie) */}
+        <select
+          value={selectedSite}
+          onChange={(e) => { setSelectedSite(e.target.value); setPage(1); }}
+          disabled={!selectedFiliale}
+          className="rounded-lg border border-input bg-card px-3 py-2.5 text-sm text-foreground shadow-sm transition-all hover:border-[#0f4b49]/40 focus:border-[#0f4b49] focus:ring-2 focus:ring-[#0f4b49]/20 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
+        >
+          <option value="">{selectedFiliale ? "Tous les sites" : "Choisir une filiale"}</option>
+          {sitesList.map((s) => (
+            <option key={s.id} value={s.id}>{s.nom}</option>
+          ))}
+        </select>
+
+        {/* Période */}
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={dateFrom}
+            max={dateTo || undefined}
+            onChange={(e) => {
+              const v = e.target.value;
+              setDateFrom(v);
+              if (v && dateTo && v > dateTo) setDateTo(v);
+              setPage(1);
+            }}
+            className="rounded-lg border border-input bg-card px-3 py-2.5 text-sm text-foreground shadow-sm transition-all hover:border-[#0f4b49]/40 focus:border-[#0f4b49] focus:ring-2 focus:ring-[#0f4b49]/20"
+          />
+          <span className="text-xs text-muted-foreground">→</span>
+          <input
+            type="date"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={(e) => {
+              const v = e.target.value;
+              setDateTo(v);
+              if (v && dateFrom && v < dateFrom) setDateFrom(v);
+              setPage(1);
+            }}
+            className="rounded-lg border border-input bg-card px-3 py-2.5 text-sm text-foreground shadow-sm transition-all hover:border-[#0f4b49]/40 focus:border-[#0f4b49] focus:ring-2 focus:ring-[#0f4b49]/20"
+          />
+        </div>
+
+        {/* Toggle unité kWh / € — n'impacte QUE la colonne Recharge domicile */}
+        <div className="inline-flex overflow-hidden rounded-lg border border-border bg-card">
+          <button
+            type="button"
+            onClick={() => setUnit("kwh")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${unit === "kwh" ? "bg-chargiz-teal text-white" : "text-foreground hover:bg-muted"}`}
+          >
+            kWh
+          </button>
+          <button
+            type="button"
+            onClick={() => setUnit("eur")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${unit === "eur" ? "bg-chargiz-teal text-white" : "text-foreground hover:bg-muted"}`}
+          >
+            €
+          </button>
+        </div>
+
         {/* BugID_034 — Toggle "Inclure archivés" (masqués par défaut) */}
         <label className="inline-flex select-none items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground hover:bg-muted cursor-pointer">
           <input
@@ -372,33 +546,26 @@ function ListeCollaborateurs() {
         </label>
       </div>
 
+      {/* ─── Tableau simplifié : exactement ces 7 colonnes (CDC + maquette) ─── */}
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50 whitespace-nowrap">
-                <SortableHeader sortKey="prenom" sort={sort} onChange={setSort}>Prénom</SortableHeader>
-                <SortableHeader sortKey="nom" sort={sort} onChange={setSort}>Nom</SortableHeader>
-                {isSuperadmin && <SortableHeader sortKey="entreprise" sort={sort} onChange={setSort}>Entreprise</SortableHeader>}
-                <SortableHeader sortKey="immatriculation" sort={sort} onChange={setSort}>Immatriculation</SortableHeader>
-                <SortableHeader sortKey="domKwh" sort={sort} onChange={setSort} align="right">Rech. Dom (kWh)</SortableHeader>
-                <SortableHeader sortKey="domEur" sort={sort} onChange={setSort} align="right">Rech. Dom (€)</SortableHeader>
-                <SortableHeader sortKey="horsKwh" sort={sort} onChange={setSort} align="right">Rech. Hors (kWh)</SortableHeader>
-                <SortableHeader sortKey="km" sort={sort} onChange={setSort} align="right">Km</SortableHeader>
-                <SortableHeader sortKey="conso" sort={sort} onChange={setSort} align="right">
-                  <span>Conso. moy.<br/><span className="text-[10px] font-normal">kWh/100km</span></span>
-                </SortableHeader>
-                <SortableHeader sortKey="co2" sort={sort} onChange={setSort} align="right">
-                  <span>CO₂ évité<br/><span className="text-[10px] font-normal">kg</span></span>
-                </SortableHeader>
-                <SortableHeader sortKey="etat" sort={sort} onChange={setSort}>État</SortableHeader>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
+          <table className="text-sm cz-table-collab" style={{ width: "100%" }}>
+            <thead className="cz-table-head">
+              <tr className="whitespace-nowrap bg-[#0f4b49] text-white">
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Prénom</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Nom</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Immat.</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">Recharge domicile</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">Recharge hors domicile</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">Kilométrage</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">Consommation moyenne</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">CO₂ évité</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={isSuperadmin ? 12 : 11}>
+                  <td colSpan={7}>
                     <EmptyState
                       icon={Users}
                       title={search ? "Aucun résultat" : "Aucun collaborateur"}
@@ -411,80 +578,38 @@ function ListeCollaborateurs() {
                     />
                   </td>
                 </tr>
-              ) : paginated.map((collab) => {
-                const ent = isSuperadmin ? entreprises.get(collab.entreprise_id) : null;
-                const veh = vehiculesByCollab.get(collab.id);
+              ) : paginated.map((collab, rowIdx) => {
                 const sess = sessionsAgg.get(collab.id) || { domKwh: 0, domEur: 0, horsKwh: 0 };
                 const kpi = kpisByCollab.get(collab.id) || { conso: null, co2: null, km: null };
+                const veh = vehiculesByCollab.get(collab.id);
+                const fmt0 = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
+                const fmt1 = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                const fmt2 = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 return (
-                <tr key={collab.id} className="hover:bg-muted/30 transition-colors whitespace-nowrap">
-                  <td className="px-4 py-3 font-medium text-card-foreground">{collab.prenom}</td>
-                  <td className="px-4 py-3 font-medium text-card-foreground">{collab.nom}</td>
-                  {isSuperadmin && (
-                    <td className="px-4 py-3">
-                      {ent ? (
-                        <Link to="/dashboard/listes/entreprises/$id" params={{ id: ent.id }} className="text-card-foreground hover:underline text-xs">
-                          {ent.nom}
-                        </Link>
-                      ) : <span className="text-muted-foreground italic text-xs">—</span>}
-                    </td>
-                  )}
-                  <td className="px-4 py-3 font-mono text-xs text-card-foreground">{veh?.immatriculation || "—"}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-card-foreground">{sess.domKwh.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-card-foreground">{sess.domEur.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-card-foreground">{sess.horsKwh.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{kpi.km != null ? kpi.km.toFixed(0) : "—"}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{kpi.conso != null ? kpi.conso.toFixed(1) : "—"}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{kpi.co2 != null ? kpi.co2.toFixed(0) : "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${collab.is_active ? "bg-chargiz-teal/10 text-chargiz-teal" : "bg-destructive/10 text-destructive"}`}>
-                      {collab.is_active ? "Actif" : "Archivé"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <IconTooltip label="Voir la fiche">
-                        <Link to="/dashboard/collaborateur/$id" params={{ id: collab.id }} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </IconTooltip>
-                      {collab.is_active ? (
-                        <IconTooltip label="Archiver">
-                          <button
-                            onClick={() => handleArchive(collab)}
-                            disabled={processingId === collab.id}
-                            className="rounded-md p-1.5 text-muted-foreground hover:bg-amber-500/10 hover:text-amber-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            {processingId === collab.id
-                              ? <span className="h-4 w-4 block animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
-                              : <Archive className="h-4 w-4" />}
-                          </button>
-                        </IconTooltip>
+                  <tr
+                    key={collab.id}
+                    className={`border-b border-border/60 last:border-0 cursor-pointer whitespace-nowrap transition-colors hover:bg-[#0f4b49]/[0.07] ${rowIdx % 2 === 1 ? "bg-[#0f4b49]/[0.03]" : "bg-card"} ${collab.is_active ? "" : "opacity-60"}`}
+                    onClick={() => { window.location.href = `/dashboard/collaborateur/${collab.id}`; }}
+                  >
+                    <td className="px-6 py-4 text-left font-medium text-card-foreground">{collab.prenom}</td>
+                    <td className="px-6 py-4 text-left text-card-foreground">{collab.nom}</td>
+                    <td className="px-6 py-4 text-left">
+                      {veh?.immatriculation ? (
+                        <span className="inline-flex items-center rounded-md bg-[#0f4b49]/10 px-2 py-0.5 font-mono text-xs font-semibold tracking-wide text-[#0f4b49]">
+                          {normalizeImmat(veh.immatriculation)}
+                        </span>
                       ) : (
-                        <IconTooltip label="Réactiver">
-                          <button
-                            onClick={() => handleUnarchive(collab)}
-                            disabled={processingId === collab.id}
-                            className="rounded-md p-1.5 text-muted-foreground hover:bg-chargiz-teal/10 hover:text-chargiz-teal transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            {processingId === collab.id
-                              ? <span className="h-4 w-4 block animate-spin rounded-full border-2 border-chargiz-teal border-t-transparent" />
-                              : <ArchiveRestore className="h-4 w-4" />}
-                          </button>
-                        </IconTooltip>
+                        <span className="text-muted-foreground">—</span>
                       )}
-                      <IconTooltip label="Supprimer définitivement">
-                        <button
-                          onClick={() => setDeleteTarget(collab)}
-                          disabled={processingId === collab.id}
-                          className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </IconTooltip>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-6 py-4 text-center tabular-nums text-card-foreground">
+                      {unit === "kwh" ? `${fmt0(sess.domKwh)} kWh` : `${fmt2(sess.domEur)} €`}
+                    </td>
+                    <td className="px-6 py-4 text-center tabular-nums text-card-foreground">{`${fmt0(sess.horsKwh)} kWh`}</td>
+                    <td className="px-6 py-4 text-center tabular-nums text-card-foreground">{kpi.km != null ? `${fmt0(kpi.km)} km` : "—"}</td>
+                    <td className="px-6 py-4 text-center tabular-nums text-card-foreground">{kpi.conso != null ? `${fmt1(kpi.conso)} kWh/100km` : "—"}</td>
+                    <td className="px-6 py-4 text-center tabular-nums text-card-foreground">{kpi.co2 != null ? `${fmt1(kpi.co2 / 1000)} t` : "—"}</td>
+                  </tr>
                 );
               })}
             </tbody>
@@ -512,6 +637,101 @@ function ListeCollaborateurs() {
         onConfirm={doDelete}
         loading={deleting}
       />
+
+      {/* BugID_032 — Rapport d'import detaille */}
+      {importReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-card shadow-2xl border border-border max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="text-base font-semibold text-card-foreground">Rapport d'import CSV</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">{importReport.message}</p>
+              </div>
+              <button onClick={() => setImportReport(null)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Cartes synthèse */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-4 border-b border-border">
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                <p className="text-xs text-muted-foreground">Total lignes</p>
+                <p className="mt-1 text-xl font-semibold text-card-foreground">{importReport.total_rows}</p>
+              </div>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center">
+                <p className="text-xs text-emerald-700">Créés</p>
+                <p className="mt-1 text-xl font-semibold text-emerald-700">{importReport.success_count}</p>
+              </div>
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-center">
+                <p className="text-xs text-red-700">Erreurs</p>
+                <p className="mt-1 text-xl font-semibold text-red-700">{importReport.error_count}</p>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
+                <p className="text-xs text-amber-700">Ignorés</p>
+                <p className="mt-1 text-xl font-semibold text-amber-700">{importReport.skipped_count}</p>
+              </div>
+            </div>
+
+            {/* Liste détaillée scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+              {importReport.errors.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-red-700 mb-2">❌ Erreurs ({importReport.errors.length})</h3>
+                  <div className="rounded-lg border border-red-200 bg-red-50/50 divide-y divide-red-200">
+                    {importReport.errors.map((e, i) => (
+                      <div key={i} className="px-3 py-2 text-xs flex items-start gap-2">
+                        <span className="font-mono text-red-700 shrink-0">Ligne&nbsp;{e.row}</span>
+                        <span className="text-card-foreground">{e.email || "—"}</span>
+                        <span className="ml-auto text-red-700 font-medium">{e.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {importReport.skipped.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-amber-700 mb-2">⚠ Ignorés ({importReport.skipped.length})</h3>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50/50 divide-y divide-amber-200">
+                    {importReport.skipped.map((s, i) => (
+                      <div key={i} className="px-3 py-2 text-xs flex items-start gap-2">
+                        <span className="font-mono text-amber-700 shrink-0">Ligne&nbsp;{s.row}</span>
+                        <span className="text-card-foreground">{s.email}</span>
+                        <span className="ml-auto text-amber-700 font-medium">{s.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {importReport.created.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-emerald-700 mb-2">✅ Créés ({importReport.created.length})</h3>
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 divide-y divide-emerald-200">
+                    {importReport.created.map((c, i) => (
+                      <div key={i} className="px-3 py-2 text-xs flex items-start gap-2">
+                        <span className="font-mono text-emerald-700 shrink-0">Ligne&nbsp;{c.row}</span>
+                        <span className="text-card-foreground">{c.prenom} {c.nom}</span>
+                        <span className="ml-auto text-emerald-700">{c.email}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pied de modal */}
+            <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-border">
+              <button
+                onClick={() => setImportReport(null)}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:brightness-95"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

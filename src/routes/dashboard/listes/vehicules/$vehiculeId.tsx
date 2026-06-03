@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import {
   ArrowLeft, Car, User, History, Building2, Zap, Gauge, ShieldCheck, ShieldAlert,
-  Archive, ArchiveRestore, Unplug, Power, AlertTriangle, CheckCircle2, Loader2, Battery, ChevronRight, Info, Check,
+  Archive, ArchiveRestore, Unlink, Power, AlertTriangle, CheckCircle2, Loader2, Battery, ChevronRight, Info, Check,
 } from "lucide-react";
 import { api, apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +11,7 @@ import VehicleDetachDialog from "@/components/VehicleDetachDialog";
 import SuspendSubscriptionDialog from "@/components/SuspendSubscriptionDialog";
 import PageSkeleton from "@/components/PageSkeleton";
 import SectionHeader from "@/components/SectionHeader";
+import EntityAuditHistory from "@/components/EntityAuditHistory";
 
 export const Route = createFileRoute("/dashboard/listes/vehicules/$vehiculeId")({
   component: FicheVehicule,
@@ -24,6 +25,8 @@ interface Vehicule {
   vin: string | null;
   immatriculation: string | null;
   capacite_batterie: number | null;
+  kilometrage: number | null;
+  type_smartcar: string | null;
   statut_smartcar: string;
   statut_affectation: string;
   collaborateur_id: string | null;
@@ -227,7 +230,7 @@ function FicheVehicule() {
           {canManage && !isArchived && vehicule.collaborateur_id && (
             <button onClick={() => setShowDetach(true)} disabled={actionLoading}
               className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-500/10 disabled:opacity-40">
-              <Unplug className="h-3.5 w-3.5" /> Détacher
+              <Unlink className="h-3.5 w-3.5" /> Détacher
             </button>
           )}
           {canSuspend && !isArchived && isConnected && (
@@ -260,6 +263,7 @@ function FicheVehicule() {
             <div className="grid grid-cols-3 gap-3"><dt className="text-muted-foreground">Modèle</dt><dd className="col-span-2 font-medium">{vehicule.modele || "—"}</dd></div>
             <div className="grid grid-cols-3 gap-3"><dt className="text-muted-foreground">VIN</dt><dd className="col-span-2 font-mono text-xs">{vehicule.vin || "—"}</dd></div>
             <div className="grid grid-cols-3 gap-3"><dt className="text-muted-foreground">Immatriculation</dt><dd className="col-span-2 font-mono text-xs uppercase">{vehicule.immatriculation || "—"}</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-muted-foreground">Kilométrage</dt><dd className="col-span-2 font-medium tabular-nums">{vehicule.kilometrage != null ? `${vehicule.kilometrage.toLocaleString("fr-FR")} km` : "—"}</dd></div>
             {entreprise && (
               <div className="grid grid-cols-3 gap-3">
                 <dt className="text-muted-foreground">Entreprise</dt>
@@ -334,7 +338,7 @@ function FicheVehicule() {
       <SectionHeader>Historique d'affectations</SectionHeader>
       <div className="mb-8 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <table className="w-full text-sm">
-          <thead>
+          <thead className="cz-table-head">
             <tr className="border-b border-border bg-muted/30">
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Collaborateur</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Affecté le</th>
@@ -360,7 +364,7 @@ function FicheVehicule() {
       <div className="mb-8 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="cz-table-head">
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Collaborateur</th>
@@ -396,6 +400,13 @@ function FicheVehicule() {
           </p>
         )}
       </div>
+
+      {/* Historique des modifications (CDC §2.6.2 / Étape 0 Lot 2) */}
+      <EntityAuditHistory
+        entityType="vehicule"
+        entityId={vehiculeId}
+        title="Historique des modifications du véhicule"
+      />
 
       {/* Dialogs */}
       <VehicleDetachDialog

@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
-import { Car, ChevronRight, ChevronLeft, Loader2, AlertCircle, CheckCircle2, MapPin, User as UserIcon } from "lucide-react";
+import { Car, ChevronRight, ChevronLeft, Loader2, AlertCircle, CheckCircle2, MapPin, User as UserIcon, Plus, X, Link2 } from "lucide-react";
 import VehiculeSelector, { type VehiculeSelectorValue } from "@/components/VehiculeSelector";
 import AddressAutocomplete, { type AddressValue } from "@/components/AddressAutocomplete";
 import MapPinPicker from "@/components/MapPinPicker";
+import { normalizeImmat as normImmat, getImmatError } from "@/lib/immat";
 
 export const Route = createFileRoute("/onboarding/$token")({
   component: OnboardingPage,
@@ -30,11 +31,10 @@ interface OnboardingData {
   };
 }
 
-type Step = "profil" | "adresse" | "vehicule";
+type Step = "profil" | "adresse" | "vehicule" | "smartcar";
 
-function normalizeImmat(raw: string): string {
-  return raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
-}
+// Réutilise l'util partagé (CDC §5.1.1.2 — lettre + chiffre obligatoires)
+const normalizeImmat = normImmat;
 
 function OnboardingPage() {
   const { token } = Route.useParams();
@@ -53,8 +53,16 @@ function OnboardingPage() {
   });
   const [pointRechargeDistant, setPointRechargeDistant] = useState<"non" | "oui">("non");
   const [pointRecharge, setPointRecharge] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
+  // CDC §5.3 — Adresse secondaire optionnelle (résidence alternative)
+  const [showSecondaire, setShowSecondaire] = useState(false);
+  const [adresseSecondaire, setAdresseSecondaire] = useState<AddressValue>({
+    pays_code: "FR", adresse: "", code_postal: "", ville: "",
+    latitude: null, longitude: null,
+  });
   const [vehicule, setVehicule] = useState<VehiculeSelectorValue>({ marque: "", modele: "", capacite_batterie: null });
   const [immat, setImmat] = useState("");
+  // URL Smartcar récupérée après l'étape véhicule, utilisée à l'étape 4
+  const [smartcarUrl, setSmartcarUrl] = useState<string>("");
 
   useEffect(() => {
     apiFetch<OnboardingData>(`/api/onboarding/${token}`)
@@ -94,16 +102,27 @@ function OnboardingPage() {
     if (!adresse.adresse.trim() || !adresse.code_postal.trim() || !adresse.ville.trim()) {
       setFormError("Adresse complète requise."); return false;
     }
+    if (showSecondaire && adresseSecondaire.adresse.trim() && (!adresseSecondaire.code_postal.trim() || !adresseSecondaire.ville.trim())) {
+      setFormError("Adresse secondaire incomplète."); return false;
+    }
     setSaving(true); setFormError("");
     try {
       // Si point de recharge distant, on utilise ses coordonnées comme home_lat/lng
       const useDistantPoint = pointRechargeDistant === "oui" && pointRecharge.lat != null && pointRecharge.lng != null;
+
+      // 1) Sauvegarde de l'adresse principale via endpoint d'onboarding
       await apiFetch(`/api/onboarding/${token}/home`, {
         method: "PATCH",
         body: JSON.stringify({
           latitude: useDistantPoint ? pointRecharge.lat : adresse.latitude,
           longitude: useDistantPoint ? pointRecharge.lng : adresse.longitude,
           address: `${adresse.adresse}, ${adresse.code_postal} ${adresse.ville}`,
+          // Adresse secondaire optionnelle (CDC §5.3)
+          adresse_secondaire: showSecondaire && adresseSecondaire.adresse
+            ? `${adresseSecondaire.adresse}, ${adresseSecondaire.code_postal} ${adresseSecondaire.ville}`
+            : null,
+          lat_secondaire: showSecondaire ? adresseSecondaire.latitude : null,
+          lng_secondaire: showSecondaire ? adresseSecondaire.longitude : null,
         }),
       });
       return true;
@@ -117,6 +136,12 @@ function OnboardingPage() {
     if (!vehicule.marque.trim() || !vehicule.modele.trim() || !immat.trim()) {
       setFormError("Marque, modèle et immatriculation sont obligatoires."); return false;
     }
+    // CDC §5.1.1.2 — validation immatriculation (lettre + chiffre obligatoires)
+    const immatErr = getImmatError(immat);
+    if (immatErr) {
+      setFormError(`Immatriculation : ${immatErr.toLowerCase()}`);
+      return false;
+    }
     setSaving(true); setFormError("");
     try {
       const res = await apiFetch<{ smartcar_auth_url: string }>(`/api/onboarding/${token}/vehicule`, {
@@ -128,14 +153,14 @@ function OnboardingPage() {
           capacite_batterie: vehicule.capacite_batterie,
         }),
       });
-      // Redirection vers Smartcar pour finaliser (CDC §3.6.2)
-      window.location.href = res.smartcar_auth_url;
+      // CDC §3.6.2 — On stocke l'URL Smartcar et on passe à l'étape 4
+      // (le user clique explicitement sur "Connecter mon véhicule" à l'étape 4)
+      setSmartcarUrl(res.smartcar_auth_url || data?.smartcar_auth_url || "");
       return true;
     } catch (err: any) {
       setFormError(err.message || "Erreur lors de la sauvegarde du véhicule.");
-      setSaving(false);
       return false;
-    }
+    } finally { setSaving(false); }
   };
 
   // ─── Navigation ─────────────────────────────────────────────────────────
@@ -145,13 +170,17 @@ function OnboardingPage() {
     } else if (step === "adresse") {
       if (await saveAdresse()) setStep("vehicule");
     } else if (step === "vehicule") {
-      await saveVehicule();  // ← redirige vers Smartcar
+      if (await saveVehicule()) setStep("smartcar");
+    } else if (step === "smartcar") {
+      // Redirection finale vers Smartcar
+      if (smartcarUrl) window.location.href = smartcarUrl;
     }
   };
   const prevStep = () => {
     setFormError("");
     if (step === "adresse") setStep("profil");
     else if (step === "vehicule") setStep("adresse");
+    else if (step === "smartcar") setStep("vehicule");
   };
 
   // ─── Loading / Error / Already connected ────────────────────────────────
@@ -203,6 +232,7 @@ function OnboardingPage() {
     { key: "profil", label: "Profil", icon: UserIcon },
     { key: "adresse", label: "Adresse", icon: MapPin },
     { key: "vehicule", label: "Véhicule", icon: Car },
+    { key: "smartcar", label: "Smartcar", icon: Link2 },
   ];
   const currentIndex = steps.findIndex(s => s.key === step);
 
@@ -218,7 +248,7 @@ function OnboardingPage() {
             Bienvenue, <span className="text-primary">{prenom}</span>
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Finalisez votre inscription en 3 étapes pour connecter votre véhicule.
+            Finalisez votre inscription en 4 étapes pour connecter votre véhicule.
           </p>
         </div>
 
@@ -351,6 +381,36 @@ function OnboardingPage() {
                   />
                 )}
               </div>
+
+              {/* Résidence secondaire optionnelle (CDC §5.3) */}
+              <div className="border-t border-border pt-4">
+                {showSecondaire ? (
+                  <div className="rounded-lg border border-border bg-muted/20 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-sm font-medium text-card-foreground">Résidence secondaire (optionnel)</p>
+                      <button
+                        type="button"
+                        onClick={() => { setShowSecondaire(false); setAdresseSecondaire({ pays_code: profil.pays_code, adresse: "", code_postal: "", ville: "", latitude: null, longitude: null }); }}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" /> Retirer
+                      </button>
+                    </div>
+                    <p className="mb-3 text-[11px] text-muted-foreground">
+                      Si vous rechargez aussi dans une 2e résidence (parents, conjoint, location longue durée…), précisez-la ici pour qu'elle soit reconnue comme un point de recharge à domicile.
+                    </p>
+                    <AddressAutocomplete value={adresseSecondaire} onChange={setAdresseSecondaire} hideCountry />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowSecondaire(true)}
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-card p-3 text-sm font-medium text-muted-foreground hover:bg-muted/30"
+                  >
+                    <Plus className="h-4 w-4" /> Ajouter une résidence secondaire (optionnel)
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -372,17 +432,52 @@ function OnboardingPage() {
                   className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm font-mono uppercase tracking-wide outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   value={immat}
                   onChange={e => setImmat(normalizeImmat(e.target.value))}
-                  placeholder="AB123CD"
-                  maxLength={10}
+                  placeholder="AB-123-CD"
+                  maxLength={9}
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Lettres et chiffres uniquement — saisie auto-formatée.
-                </p>
               </div>
               <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
-                <strong className="text-foreground">Prochaine étape :</strong> vous serez redirigé vers Smartcar
-                pour autoriser ChargiZ à récupérer les données de votre véhicule (kilométrage, état de charge…).
-                ChargiZ ne voit jamais vos identifiants constructeur.
+                <strong className="text-foreground">Prochaine étape :</strong> connexion Smartcar pour autoriser ChargiZ à récupérer les données de votre véhicule (kilométrage, état de charge…). ChargiZ ne voit jamais vos identifiants constructeur.
+              </div>
+            </div>
+          )}
+
+          {/* ═══ ÉTAPE 4 — CONNEXION SMARTCAR ═══ */}
+          {step === "smartcar" && (
+            <div className="space-y-5">
+              <div className="text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                  <Link2 className="h-7 w-7 text-primary" />
+                </div>
+                <h2 className="text-lg font-semibold text-card-foreground">Connexion Smartcar</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Dernière étape : vous allez être redirigé vers Smartcar pour autoriser ChargiZ à accéder aux données de votre véhicule.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3 text-sm">
+                <div className="flex items-start gap-2.5">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-chargiz-teal" />
+                  <p className="text-card-foreground">
+                    <strong className="font-medium">Sécurisé</strong> — ChargiZ ne voit jamais vos identifiants constructeur. Vous vous connectez directement sur la plateforme officielle Smartcar.
+                  </p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-chargiz-teal" />
+                  <p className="text-card-foreground">
+                    <strong className="font-medium">Réversible</strong> — Vous pourrez révoquer l'accès à tout moment depuis votre espace ChargiZ ou Smartcar.
+                  </p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-chargiz-teal" />
+                  <p className="text-card-foreground">
+                    <strong className="font-medium">Minimal</strong> — Seuls le kilométrage, l'état de charge et la position GPS lors des sessions sont utilisés.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 text-xs text-muted-foreground">
+                <p>Cliquez sur le bouton ci-dessous pour vous rediriger vers Smartcar. Une fois la connexion confirmée, vous serez automatiquement ramené à votre espace ChargiZ.</p>
               </div>
             </div>
           )}
@@ -406,8 +501,10 @@ function OnboardingPage() {
               {saving
                 ? <><Loader2 className="h-4 w-4 animate-spin" /> Enregistrement...</>
                 : step === "vehicule"
-                  ? <>Connecter mon véhicule <ChevronRight className="h-4 w-4" /></>
-                  : <>Continuer <ChevronRight className="h-4 w-4" /></>}
+                  ? <>Étape suivante <ChevronRight className="h-4 w-4" /></>
+                  : step === "smartcar"
+                    ? <>Connecter mon véhicule <ChevronRight className="h-4 w-4" /></>
+                    : <>Continuer <ChevronRight className="h-4 w-4" /></>}
             </button>
           </div>
         </div>
